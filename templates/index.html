@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Association Game</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+</head>
+<body>
+    <h1>Willkommen zum Association Game!</h1>
+    <form id="playerForm">
+        <label for="players">Teilnehmerzahl festlegen:</label>
+        <input type="number" id="players" name="players" min="2" required>
+        <button type="submit">Starten</button>
+    </form>
+
+    <script>
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        document.getElementById('playerForm').onsubmit = function(e) {
+            e.preventDefault();
+            var players = document.getElementById('players').value;
+            socket.emit('set_players', { players: players }); // Socket-Nachricht senden
+            window.location.href = '/play'; // Weiterleitung zur Spielseite
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spiel läuft</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+</head>
+<body>
+    <h1>Das Spiel läuft!</h1>
+    <p>Gib deine Antwort unten ein:</p>
+    <form id="answerForm">
+        <input type="text" name="answer" placeholder="Deine Antwort" required>
+        <button type="submit">Absenden</button>
+    </form>
+    <div id="answers">
+        <h2>Alle Antworten:</h2>
+        <ul id="answerList"></ul>
+    </div>
+
+    <script>
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        document.getElementById('answerForm').onsubmit = function(e) {
+            e.preventDefault();
+            var answer = document.querySelector('input[name="answer"]').value;
+            socket.emit('submit_answer', { answer: answer }); // Antwort über WebSocket senden
+            document.querySelector('input[name="answer"]').value = ''; // Eingabefeld leeren
+        };
+
+        socket.on('new_answer', function(data) {
+            var li = document.createElement('li');
+            li.textContent = data.answer;
+            document.getElementById('answerList').appendChild(li);
+        });
+    </script>
+</body>
+</html>

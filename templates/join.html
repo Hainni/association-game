@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teilnehmer beitreten</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+</head>
+<body>
+    <h1>Du hast dem Spiel beigetreten!</h1>
+    <p>Bitte warte, bis das Spiel beginnt.</p>
+    <div id="playerCount"></div>
+
+    <script>
+        var socket = io.connect('http://' + document.domain + ':' + location.port);
+        
+        socket.on('player_count', function(data) {
+            document.getElementById('playerCount').innerHTML = 
+                'Aktuelle Spieler: ' + data.current_players + ' von ' + data.max_players + ' maximalen Spielern.';
+        });
+
+        // Sendet eine Nachricht, wenn der Spieler beigetreten ist
+        socket.emit('join_game');
+    </script>
+</body>
+</html>

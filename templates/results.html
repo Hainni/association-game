@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Ergebnisse</title>
+</head>
+<body>
+    <h1>Ergebnisse für die Kategorie: {{ category }}</h1>
+    <ul>
+        {% for answer in answers %}
+            <li>{{ answer }}</li>
+        {% endfor %}
+    </ul>
+    <a href="{{ url_for('index') }}">Neue Runde starten</a>
+</body>
+</html>
