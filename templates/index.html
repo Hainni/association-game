@@ -21,7 +21,7 @@
             e.preventDefault();
             var players = document.getElementById('players').value;
             socket.emit('set_players', { players: players }); // Socket-Nachricht senden
-            window.location.href = '/play'; // Weiterleitung zur Spielseite
+            window.location.href = '/join'; // Weiterleitung zur Spielseite
         };
     </script>
 </body>

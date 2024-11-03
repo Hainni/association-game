@@ -17,9 +17,14 @@
         socket.on('player_count', function(data) {
             document.getElementById('playerCount').innerHTML = 
                 'Aktuelle Spieler: ' + data.current_players + ' von ' + data.max_players + ' maximalen Spielern.';
+
+            // Wenn die maximale Anzahl an Teilnehmern erreicht ist, zur Spielseite weiterleiten
+            if (data.current_players >= data.max_players) {
+                window.location.href = '/play';
+            }
         });
 
-        // Sendet eine Nachricht, wenn der Spieler beigetreten ist
+        // Sende Nachricht, wenn ein neuer Spieler beitritt
         socket.emit('join_game');
     </script>
 </body>

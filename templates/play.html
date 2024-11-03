@@ -7,12 +7,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
 </head>
 <body>
-    <h1>Das Spiel läuft!</h1>
+    <!-- Zeigt die Kategorie statt "Das Spiel läuft" an -->
+    <h1>Die Kategorie ist: {{ category }}</h1>
+    
     <p>Gib deine Antwort unten ein:</p>
     <form id="answerForm">
         <input type="text" name="answer" placeholder="Deine Antwort" required>
         <button type="submit">Absenden</button>
     </form>
+    
     <div id="answers">
         <h2>Alle Antworten:</h2>
         <ul id="answerList"></ul>
