@@ -7,34 +7,53 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
 </head>
 <body>
-    <!-- Zeigt die Kategorie statt "Das Spiel läuft" an -->
+    <!-- Zeigt die Kategorie an -->
     <h1>Die Kategorie ist: {{ category }}</h1>
     
     <p>Gib deine Antwort unten ein:</p>
     <form id="answerForm">
-        <input type="text" name="answer" placeholder="Deine Antwort" required>
-        <button type="submit">Absenden</button>
+        <input type="text" id="answerInput" name="answer" placeholder="Deine Antwort" required>
+        <button type="submit" id="submitButton">Absenden</button>
     </form>
     
-    <div id="answers">
+    <div id="answers" style="display: none;">
         <h2>Alle Antworten:</h2>
         <ul id="answerList"></ul>
     </div>
 
     <script>
         var socket = io.connect('http://' + document.domain + ':' + location.port);
+        var submitButton = document.getElementById('submitButton');
+        var answerInput = document.getElementById('answerInput');
+        var answerForm = document.getElementById('answerForm');
 
-        document.getElementById('answerForm').onsubmit = function(e) {
+        // Event-Handler für das Absenden des Formulars
+        answerForm.onsubmit = function(e) {
             e.preventDefault();
-            var answer = document.querySelector('input[name="answer"]').value;
-            socket.emit('submit_answer', { answer: answer }); // Antwort über WebSocket senden
-            document.querySelector('input[name="answer"]').value = ''; // Eingabefeld leeren
+            var answer = answerInput.value;
+
+            // Antwort über WebSocket senden
+            socket.emit('submit_answer', { answer: answer });
+
+            // Eingabefeld deaktivieren und Button ausgrauen
+            answerInput.disabled = true;
+            submitButton.disabled = true;
+            submitButton.style.backgroundColor = '#ccc';
         };
 
-        socket.on('new_answer', function(data) {
-            var li = document.createElement('li');
-            li.textContent = data.answer;
-            document.getElementById('answerList').appendChild(li);
+        // Empfange Signal, wenn alle Antworten abgegeben wurden
+        socket.on('all_answers_submitted', function(data) {
+            // Antworten anzeigen
+            var answerList = document.getElementById('answerList');
+            answerList.innerHTML = ''; // Liste leeren, um alle Antworten neu darzustellen
+            data.answers.forEach(function(answer) {
+                var li = document.createElement('li');
+                li.textContent = answer;
+                answerList.appendChild(li);
+            });
+
+            // Antworten-Container anzeigen
+            document.getElementById('answers').style.display = 'block';
         });
     </script>
 </body>
