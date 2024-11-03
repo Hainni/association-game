@@ -11,6 +11,7 @@ players = {}
 answers = []
 max_players = 3
 current_players = 0
+current_category = None
 
 def load_categories():
     """Lädt Kategorien aus einer Textdatei"""
@@ -54,9 +55,21 @@ def join():
 
 @app.route('/play')
 def play():
+    global current_category
     categories = load_categories()
-    random_category = random.choice(categories)  # Wählt eine zufällige Kategorie aus
-    return render_template('play.html', category=random_category)
+    if current_category is None:
+        # Wähle zufällig eine Kategorie
+        current_category = random.choice(categories)
+        # Sende die Kategorie an alle Clients
+        socketio.emit('category_selected', {'category': current_category}, to='/')
+    return render_template('play.html', category=current_category)
+
+# def play():
+#     categories = load_categories()
+#     random_category = random.choice(categories)  # Wählt eine zufällige Kategorie aus
+#     # Sende die Kategorie an alle Clients
+#     socketio.emit('category_selected', {'category': random_category}, to='/')
+#     return render_template('play.html', category=random_category)
 
 @socketio.on('submit_answer')
 def handle_submit_answer(data):

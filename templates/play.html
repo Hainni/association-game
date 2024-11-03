@@ -41,6 +41,11 @@
             submitButton.style.backgroundColor = '#ccc';
         };
 
+        // Empfange Signal für die ausgewählte Kategorie
+        socket.on('category_selected', function(data) {
+            document.querySelector('h1').textContent = 'Die Kategorie ist: ' + data.category;
+        });
+
         // Empfange Signal, wenn alle Antworten abgegeben wurden
         socket.on('all_answers_submitted', function(data) {
             // Antworten anzeigen
