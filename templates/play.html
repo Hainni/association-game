@@ -21,49 +21,68 @@
         <ul id="answerList"></ul>
     </div>
 
+    <div id="readySection" style="display: none; margin-top: 20px;">
+        <button id="readyButton">Bereit für nächste Runde</button>
+        <p id="readyStatus"></p>
+    </div>
+
     <script>
         var socket = io.connect('http://' + document.domain + ':' + location.port);
         var submitButton = document.getElementById('submitButton');
         var answerInput = document.getElementById('answerInput');
         var answerForm = document.getElementById('answerForm');
+        var readySection = document.getElementById('readySection');
+        var readyButton = document.getElementById('readyButton');
+        var readyStatus = document.getElementById('readyStatus');
 
-        // Event-Handler für das Absenden des Formulars
         answerForm.onsubmit = function(e) {
             e.preventDefault();
             var answer = answerInput.value;
-
-            // Antwort über WebSocket senden
             socket.emit('submit_answer', { answer: answer });
-
-            // Eingabefeld deaktivieren und Button ausgrauen
             answerInput.disabled = true;
             submitButton.disabled = true;
             submitButton.style.backgroundColor = '#ccc';
         };
 
-        // Empfange Signal, wenn alle Antworten abgegeben wurden
+        // Wenn alle Antworten eingegangen sind
         socket.on('all_answers_submitted', function(data) {
-            // Antworten anzeigen
             var answerList = document.getElementById('answerList');
-            answerList.innerHTML = ''; // Liste leeren, um alle Antworten neu darzustellen
+            answerList.innerHTML = '';
             data.answers.forEach(function(answer) {
                 var li = document.createElement('li');
                 li.textContent = answer;
                 answerList.appendChild(li);
             });
 
-            // Antworten-Container anzeigen
             document.getElementById('answers').style.display = 'block';
+            readySection.style.display = 'block'; // 🟢 Bereit-Button anzeigen
         });
 
-        // Empfange Signal für die neue Kategorie
+        // Wenn Spieler "Bereit" klickt
+        readyButton.onclick = function() {
+            socket.emit('player_ready');
+            readyButton.disabled = true;
+            readyButton.style.backgroundColor = '#ccc';
+            readyStatus.textContent = "Warte auf andere Spieler...";
+        };
+
+        // Aktualisiere den Bereit-Status
+        socket.on('ready_count', function(data) {
+            readyStatus.textContent = `Bereit: ${data.ready}/${data.total}`;
+        });
+
+        // Wenn neue Kategorie gestartet wird
         socket.on('new_category', function(data) {
-            document.getElementById('category').textContent = data.category; // Kategorie aktualisieren
-            answerInput.disabled = false; // Eingabefeld wieder aktivieren
-            submitButton.disabled = false; // Button wieder aktivieren
-            submitButton.style.backgroundColor = ''; // Button-Farbe zurücksetzen
-            answerInput.value = ''; // Eingabefeld leeren
-            document.getElementById('answers').style.display = 'none'; // Antworten-Container ausblenden
+            document.getElementById('category').textContent = data.category;
+            answerInput.disabled = false;
+            submitButton.disabled = false;
+            submitButton.style.backgroundColor = '';
+            answerInput.value = '';
+            document.getElementById('answers').style.display = 'none';
+            readySection.style.display = 'none';
+            readyButton.disabled = false;
+            readyButton.style.backgroundColor = '';
+            readyStatus.textContent = '';
         });
     </script>
 </body>

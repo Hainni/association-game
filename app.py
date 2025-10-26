@@ -14,12 +14,44 @@ current_players = 0
 current_category = None
 global categories
 
+### HILFSUNKTIONEN ###
 def load_categories():
     """Lädt Kategorien aus einer Textdatei"""
     with open('static/categories.txt', 'r', encoding='utf-8') as file:
         categories = [line.strip() for line in file if line.strip()]
     return categories
 
+def get_new_category():
+    global categories, used_categories
+
+    # Prüfe, ob alle Kategorien schon verwendet wurden
+    if len(used_categories) == len(categories):
+        used_categories.clear()
+
+    # Finde alle Kategorien, die noch übrig sind
+    remaining = [cat for cat in categories if cat not in used_categories]
+
+    # Wähle zufällige neue Kategorie
+    new_cat = random.choice(remaining)
+    used_categories.add(new_cat)
+    return new_cat
+
+def reset_game():
+    global players, answers, current_players, current_category
+    players.clear()
+    answers.clear()
+    current_players = 0
+    current_category = None
+
+### ---------------------- ###
+
+categories = load_categories()
+used_categories = set()
+ready_players = set()
+
+#####################
+### SOCKET EVENTS ###
+#####################
 @socketio.on('set_players')
 def set_players(data):
     global max_players, game_started
@@ -31,6 +63,46 @@ def set_players(data):
 def join_game():
     emit('player_count', {'current_players': current_players, 'max_players': max_players}, broadcast=True)
 
+@socketio.on('submit_answer')
+def handle_submit_answer(data):
+    global answers, current_players, current_category
+    player_id = session.get('player_id')
+
+    # Speichert die Antwort des Spielers, wenn dieser noch keine Antwort abgegeben hat
+    if player_id not in players:
+        players[player_id] = data['answer']
+        answers.append(data['answer'])
+
+    # Prüft, ob alle Spieler geantwortet haben
+    if len(answers) == current_players:
+        # Sendet alle Antworten an alle Clients
+        socketio.emit('all_answers_submitted', {'answers': answers})
+
+@socketio.on('player_ready')
+def handle_player_ready():
+    global ready_players, current_players, current_category, players, answers
+
+    player_id = session.get('player_id')
+    ready_players.add(player_id)
+
+    # 🟢 Fortschritt an alle senden
+    socketio.emit('ready_count', {
+        'ready': len(ready_players),
+        'total': current_players
+    })
+
+    # Wenn alle Spieler bereit sind → neue Runde starten
+    if len(ready_players) == current_players:
+        current_category = get_new_category()
+        answers.clear()
+        players.clear()
+        ready_players.clear()  # Reset für nächste Runde
+
+        socketio.emit('new_category', {'category': current_category})
+
+################
+### ROUTINGS ###
+################
 @app.route('/')
 def index():
     global current_players
@@ -53,7 +125,6 @@ def join():
     
     return render_template('join.html')
 
-
 @app.route('/play')
 def play():
     global current_category
@@ -65,26 +136,10 @@ def play():
         socketio.emit('category_selected', {'category': current_category}, to='/')
     return render_template('play.html', category=current_category)
 
-@socketio.on('submit_answer')
-def handle_submit_answer(data):
-    global answers, current_players, current_category
-    player_id = session.get('player_id')
+@app.route('/full')
+def full():
+    return render_template('full.html')
 
-    # Speichert die Antwort des Spielers, wenn dieser noch keine Antwort abgegeben hat
-    if player_id not in players:
-        players[player_id] = data['answer']
-        answers.append(data['answer'])
-
-    # Prüft, ob alle Spieler geantwortet haben
-    if len(answers) == current_players:
-        # Sendet alle Antworten an alle Clients
-        socketio.emit('all_answers_submitted', {'answers': answers})
-        # Wähle eine neue Kategorie
-        current_category = random.choice(categories)
-        # Sende die neue Kategorie an alle Clients
-        socketio.emit('new_category', {'category': current_category}, to='/')
-        # Leere die Antworten für die nächste Runde
-        answers.clear()
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', debug=True)

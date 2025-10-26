@@ -8,10 +8,18 @@
 </head>
 <body>
     <h1>Willkommen zum Association Game!</h1>
-    <form id="playerForm">
-        <label for="players">Teilnehmerzahl festlegen:</label>
-        <input type="number" id="players" name="players" min="2" required>
-        <button type="submit">Starten</button>
+    <form id="playerForm" style="font-size: 18px; margin-top: 20px;">
+        <label for="players">Wie viele Spieler nehmen teil?</label><br>
+        <select id="players" name="players" required style="margin: 10px; padding: 5px;">
+            <option value="" disabled selected>Bitte wählen</option>
+            <option value="2">2 Spieler</option>
+            <option value="3">3 Spieler</option>
+            <option value="4">4 Spieler</option>
+            <option value="5">5 Spieler</option>
+            <option value="6">6 Spieler</option>
+        </select>
+        <br>
+        <button type="submit" style="padding: 8px 16px; font-size: 16px;">Spiel starten</button>
     </form>
 
     <script>
@@ -20,8 +28,8 @@
         document.getElementById('playerForm').onsubmit = function(e) {
             e.preventDefault();
             var players = document.getElementById('players').value;
-            socket.emit('set_players', { players: players }); // Socket-Nachricht senden
-            window.location.href = '/join'; // Weiterleitung zur Spielseite
+            socket.emit('set_players', { players: players });
+            window.location.href = '/join';
         };
     </script>
 </body>
