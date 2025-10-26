@@ -8,7 +8,7 @@
 </head>
 <body>
     <!-- Zeigt die Kategorie an -->
-    <h1>Die Kategorie ist: {{ category }}</h1>
+    <h1>Die Kategorie ist: <span id="category">{{ category }}</span></h1>
     
     <p>Gib deine Antwort unten ein:</p>
     <form id="answerForm">
@@ -41,11 +41,6 @@
             submitButton.style.backgroundColor = '#ccc';
         };
 
-        // Empfange Signal für die ausgewählte Kategorie
-        socket.on('category_selected', function(data) {
-            document.querySelector('h1').textContent = 'Die Kategorie ist: ' + data.category;
-        });
-
         // Empfange Signal, wenn alle Antworten abgegeben wurden
         socket.on('all_answers_submitted', function(data) {
             // Antworten anzeigen
@@ -59,6 +54,16 @@
 
             // Antworten-Container anzeigen
             document.getElementById('answers').style.display = 'block';
+        });
+
+        // Empfange Signal für die neue Kategorie
+        socket.on('new_category', function(data) {
+            document.getElementById('category').textContent = data.category; // Kategorie aktualisieren
+            answerInput.disabled = false; // Eingabefeld wieder aktivieren
+            submitButton.disabled = false; // Button wieder aktivieren
+            submitButton.style.backgroundColor = ''; // Button-Farbe zurücksetzen
+            answerInput.value = ''; // Eingabefeld leeren
+            document.getElementById('answers').style.display = 'none'; // Antworten-Container ausblenden
         });
     </script>
 </body>

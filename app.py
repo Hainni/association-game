@@ -12,6 +12,7 @@ answers = []
 max_players = 3
 current_players = 0
 current_category = None
+global categories
 
 def load_categories():
     """Lädt Kategorien aus einer Textdatei"""
@@ -64,16 +65,9 @@ def play():
         socketio.emit('category_selected', {'category': current_category}, to='/')
     return render_template('play.html', category=current_category)
 
-# def play():
-#     categories = load_categories()
-#     random_category = random.choice(categories)  # Wählt eine zufällige Kategorie aus
-#     # Sende die Kategorie an alle Clients
-#     socketio.emit('category_selected', {'category': random_category}, to='/')
-#     return render_template('play.html', category=random_category)
-
 @socketio.on('submit_answer')
 def handle_submit_answer(data):
-    global answers, current_players
+    global answers, current_players, current_category
     player_id = session.get('player_id')
 
     # Speichert die Antwort des Spielers, wenn dieser noch keine Antwort abgegeben hat
@@ -85,9 +79,12 @@ def handle_submit_answer(data):
     if len(answers) == current_players:
         # Sendet alle Antworten an alle Clients
         socketio.emit('all_answers_submitted', {'answers': answers})
-        # Setzt die Antworten und Spieler für die nächste Runde zurück
-        answers = []
-        players.clear()
+        # Wähle eine neue Kategorie
+        current_category = random.choice(categories)
+        # Sende die neue Kategorie an alle Clients
+        socketio.emit('new_category', {'category': current_category}, to='/')
+        # Leere die Antworten für die nächste Runde
+        answers.clear()
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', debug=True)
