@@ -4,7 +4,38 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Association Game</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+
+    <!-- stabile Socket.IO Version -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #0B0C2A;
+            color: white;
+            text-align: center;
+            margin-top: 80px;
+        }
+        h1 {
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+        select, button {
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            font-size: 1em;
+        }
+        button {
+            background-color: #1E1F5C;
+            color: white;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #2B2C6E;
+        }
+    </style>
 </head>
 <body>
     <h1>Willkommen zum Association Game!</h1>
@@ -19,15 +50,37 @@
             <option value="6">6 Spieler</option>
         </select>
         <br>
-        <button type="submit" style="padding: 8px 16px; font-size: 16px;">Spiel starten</button>
+        <button type="submit">Spiel starten</button>
     </form>
 
     <script>
-        var socket = io.connect('http://' + document.domain + ':' + location.port);
+        const serverGameId = "{{ game_id }}";
+        const storedGameId = localStorage.getItem("game_id");
+
+        // Falls das gespeicherte Spiel älter ist -> alles löschen
+        if (storedGameId !== serverGameId) {
+            console.log("🧹 Neues Spiel erkannt – localStorage wird zurückgesetzt.");
+            localStorage.clear();
+            localStorage.setItem("game_id", serverGameId);
+        } else {
+            console.log("✅ Gleiches Spiel – localStorage bleibt bestehen.");
+        }
+
+        // Verbindung mit Session-Cookies (für korrekte Spielzuordnung)
+        const socket = io({
+            withCredentials: true,
+            transports: ['websocket', 'polling']
+        });
 
         document.getElementById('playerForm').onsubmit = function(e) {
             e.preventDefault();
-            var players = document.getElementById('players').value;
+            const players = document.getElementById('players').value;
+
+            if (!players) {
+                alert("Bitte Spieleranzahl auswählen!");
+                return;
+            }
+
             socket.emit('set_players', { players: players });
             window.location.href = '/join';
         };

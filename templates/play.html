@@ -1,89 +1,132 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spiel läuft</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spiel läuft</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    body { background-color:#0B0C2A; color:white; font-family:'Poppins',sans-serif; text-align:center; }
+    #category { background-color:#1A1B4B; padding:12px 20px; border-radius:20px; display:inline-block; font-size:1.5em; margin-top:20px; font-weight:bold; }
+    #answers ul { list-style:none; padding:0; }
+    #answers li { background-color:#1E1F5C; border-radius:10px; margin:10px auto; width:60%; padding:10px; }
+    #answers li strong { display:block; color:#FFD700; font-weight:600; }
+    #readyButton { background-color:#4CAF50; color:white; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; }
+    #readyButton:disabled { background-color:#888; }
+  </style>
 </head>
 <body>
-    <!-- Zeigt die Kategorie an -->
-    <h1>Die Kategorie ist: <span id="category">{{ category }}</span></h1>
-    
-    <p>Gib deine Antwort unten ein:</p>
-    <form id="answerForm">
-        <input type="text" id="answerInput" name="answer" placeholder="Deine Antwort" required>
-        <button type="submit" id="submitButton">Absenden</button>
-    </form>
-    
-    <div id="answers" style="display: none;">
-        <h2>Alle Antworten:</h2>
-        <ul id="answerList"></ul>
-    </div>
+  <h1>Die Kategorie ist: <span id="category">{{ category }}</span></h1>
+  <p>Gib deine Antwort unten ein:</p>
 
-    <div id="readySection" style="display: none; margin-top: 20px;">
-        <button id="readyButton">Bereit für nächste Runde</button>
-        <p id="readyStatus"></p>
-    </div>
+  <form id="answerForm">
+    <input type="text" id="answerInput" placeholder="Deine Antwort" required>
+    <button type="submit" id="submitButton">Absenden</button>
+  </form>
 
-    <script>
-        var socket = io.connect('http://' + document.domain + ':' + location.port);
-        var submitButton = document.getElementById('submitButton');
-        var answerInput = document.getElementById('answerInput');
-        var answerForm = document.getElementById('answerForm');
-        var readySection = document.getElementById('readySection');
-        var readyButton = document.getElementById('readyButton');
-        var readyStatus = document.getElementById('readyStatus');
+  <div id="answers" style="display:none;">
+    <h2>Alle Antworten:</h2>
+    <ul id="answerList"></ul>
+  </div>
 
-        answerForm.onsubmit = function(e) {
-            e.preventDefault();
-            var answer = answerInput.value;
-            socket.emit('submit_answer', { answer: answer });
-            answerInput.disabled = true;
-            submitButton.disabled = true;
-            submitButton.style.backgroundColor = '#ccc';
-        };
+  <div id="readySection" style="display:none; margin-top:20px;">
+    <button id="readyButton">Bereit für nächste Runde</button>
+    <p id="readyStatus"></p>
+  </div>
 
-        // Wenn alle Antworten eingegangen sind
-        socket.on('all_answers_submitted', function(data) {
-            var answerList = document.getElementById('answerList');
-            answerList.innerHTML = '';
-            data.answers.forEach(function(answer) {
-                var li = document.createElement('li');
-                li.textContent = answer;
-                answerList.appendChild(li);
-            });
+  <script>
+    // === Socket zuerst erstellen ===
+    const socket = io({ withCredentials: true, transports: ['websocket', 'polling'] });
 
-            document.getElementById('answers').style.display = 'block';
-            readySection.style.display = 'block'; // 🟢 Bereit-Button anzeigen
-        });
+    // === Danach Events anhängen ===
+    socket.on("server_game_id", data => {
+      const serverId = data.game_id;
+      const storedId = localStorage.getItem("game_id");
+      if (storedId && storedId !== serverId) {
+        console.log("⚠️ Alte Session erkannt, Spiel wurde neugestartet.");
+        alert("Das Spiel wurde neu gestartet. Bitte tritt erneut bei!");
+        localStorage.clear();
+        localStorage.setItem("game_id", serverId);
+        window.location.href = "/join";
+      }
+    });
 
-        // Wenn Spieler "Bereit" klickt
-        readyButton.onclick = function() {
-            socket.emit('player_ready');
-            readyButton.disabled = true;
-            readyButton.style.backgroundColor = '#ccc';
-            readyStatus.textContent = "Warte auf andere Spieler...";
-        };
+    // === Spieler-Infos aus localStorage laden ===
+    const savedName = localStorage.getItem("player_name");
+    const savedSid = localStorage.getItem("player_sid");
 
-        // Aktualisiere den Bereit-Status
-        socket.on('ready_count', function(data) {
-            readyStatus.textContent = `Bereit: ${data.ready}/${data.total}`;
-        });
+    socket.on("connect", () => {
+      localStorage.setItem("player_sid", socket.id);
+      // 🔁 Beim Seiten-Neuladen wieder am Server anmelden
+      if (savedName) {
+        socket.emit("join_game", { name: savedName, reconnect_sid: savedSid });
+        console.log(`🔁 Reconnect an Server: ${savedName}`);
+      }
+    });
 
-        // Wenn neue Kategorie gestartet wird
-        socket.on('new_category', function(data) {
-            document.getElementById('category').textContent = data.category;
-            answerInput.disabled = false;
-            submitButton.disabled = false;
-            submitButton.style.backgroundColor = '';
-            answerInput.value = '';
-            document.getElementById('answers').style.display = 'none';
-            readySection.style.display = 'none';
-            readyButton.disabled = false;
-            readyButton.style.backgroundColor = '';
-            readyStatus.textContent = '';
-        });
-    </script>
+    // === Spiellogik ===
+    const answerForm = document.getElementById("answerForm");
+    const answerInput = document.getElementById("answerInput");
+    const submitButton = document.getElementById("submitButton");
+    const readySection = document.getElementById("readySection");
+    const readyButton = document.getElementById("readyButton");
+    const readyStatus = document.getElementById("readyStatus");
+    const answerList = document.getElementById("answerList");
+
+    answerForm.onsubmit = e => {
+      e.preventDefault();
+      const answer = answerInput.value.trim();
+      if (!answer) return;
+      socket.emit("submit_answer", { answer });
+      answerInput.disabled = true;
+      submitButton.disabled = true;
+      submitButton.style.backgroundColor = "#666";
+    };
+
+    socket.on("all_answers_submitted", data => {
+      answerList.innerHTML = '';
+      data.answers.forEach(entry => {
+        const li = document.createElement("li");
+        li.innerHTML = `<strong>${entry.name}</strong><br>${entry.answer}`;
+        answerList.appendChild(li);
+      });
+      document.getElementById("answers").style.display = "block";
+    });
+
+    socket.on("ready_phase_start", () => {
+      readySection.style.display = "block";
+    });
+
+    readyButton.onclick = () => {
+      socket.emit("player_ready");
+      readyButton.disabled = true;
+      readyStatus.textContent = "Warte auf andere Spieler...";
+    };
+
+    socket.on("ready_count", data => {
+      readyStatus.textContent = `Bereit: ${data.ready}/${data.total} (${data.names.join(", ")})`;
+    });
+
+    socket.on("new_category", data => {
+    document.getElementById("category").textContent = data.category;
+
+    // Antworten-UI reset
+    answerInput.value = '';
+    answerInput.disabled = false;
+    submitButton.disabled = false;
+    submitButton.style.backgroundColor = '';
+
+    // Bereit-UI sauber zurücksetzen
+    readyButton.disabled = false;       // <-- wichtig!
+    readyStatus.textContent = '';       // <-- wichtig!
+    document.getElementById("answers").style.display = "none";
+    readySection.style.display = "none";
+  });
+
+  socket.on("force_rejoin", () => {
+    alert("Deine Verbindung ist abgelaufen. Bitte tritt neu bei!");
+    window.location.href = "/join";
+  });
+  </script>
 </body>
 </html>

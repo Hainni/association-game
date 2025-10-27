@@ -2,30 +2,94 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teilnehmer beitreten</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.0/socket.io.js"></script>
+    <title>Beitreten</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 </head>
-<body>
-    <h1>Du hast dem Spiel beigetreten!</h1>
-    <p>Bitte warte, bis das Spiel beginnt.</p>
-    <div id="playerCount"></div>
+<body style="background:#0B0C2A; color:white; text-align:center; font-family:sans-serif;">
 
-    <script>
-        var socket = io.connect('http://' + document.domain + ':' + location.port);
-        
-        socket.on('player_count', function(data) {
-            document.getElementById('playerCount').innerHTML = 
-                'Aktuelle Spieler: ' + data.current_players + ' von ' + data.max_players + ' maximalen Spielern.';
+<h1>Spiel beitreten</h1>
 
-            // Wenn die maximale Anzahl an Teilnehmern erreicht ist, zur Spielseite weiterleiten
-            if (data.current_players >= data.max_players) {
-                window.location.href = '/play';
-            }
+<div id="formContainer">
+    <p>Bitte gib deinen Namen ein:</p>
+    <form id="nameForm">
+        <input type="text" id="playerName" placeholder="Dein Name" required>
+        <button type="submit">Beitreten</button>
+    </form>
+</div>
+
+<div id="waitingRoom" style="display:none;">
+    <p id="playerCount">Warte auf andere Spieler...</p>
+</div>
+
+<script>
+    // Falls kein Name im Speicher -> niemals auto-beitreten
+    if (!localStorage.getItem("player_name")) {
+        localStorage.removeItem("player_sid");
+    }
+
+    const serverGameId = "{{ game_id }}";
+    const storedGameId = localStorage.getItem("game_id");
+
+    if (storedGameId !== serverGameId) {
+        console.log("🧹 Neues Spiel erkannt – Speicher wird gelöscht (join.html)");
+        localStorage.clear();
+        localStorage.setItem("game_id", serverGameId);
+    } else {
+        console.log("✅ Gleiches Spiel – Speicher bleibt bestehen (join.html)");
+    }
+    
+    const socket = io({
+        withCredentials: true,
+        transports: ['websocket', 'polling']
+    });
+
+    socket.on("server_game_id", data => {
+        const serverId = data.game_id;
+        const storedId = localStorage.getItem("game_id");
+        if (storedId && storedId !== serverId) {
+            console.log("⚠️ Alte Session erkannt.");
+            localStorage.clear();
+            localStorage.setItem("game_id", serverId);
+        }
         });
 
-        // Sende Nachricht, wenn ein neuer Spieler beitritt
-        socket.emit('join_game');
-    </script>
+    // Falls Spielername bereits gespeichert ist, automatisch wiederbeitreten
+    const savedName = localStorage.getItem("player_name");
+    const savedSid  = localStorage.getItem("player_sid");
+
+    socket.on("connect", () => {
+        localStorage.setItem("player_sid", socket.id);
+    });
+
+    // Name nur vorbefüllen, Nutzer muss aktiv beitreten
+    if (savedName) {
+        document.getElementById('playerName').value = savedName;
+    }
+
+    document.getElementById('nameForm').onsubmit = e => {
+        e.preventDefault();
+        const name = document.getElementById('playerName').value.trim();
+        if (!name) return;
+        localStorage.setItem("player_name", name);
+        socket.emit('join_game', { name });
+        document.getElementById('formContainer').style.display = 'none';
+        document.getElementById('waitingRoom').style.display = 'block';
+    };
+
+    socket.on('player_count', data => {
+        document.getElementById('playerCount').innerHTML =
+            `Warte auf andere Spieler... (${data.current_players}/${data.max_players})<br>` +
+            `Beigetreten: ${data.names.join(', ')}`;
+    });
+
+    socket.on('start_game', data => {
+        window.location.href = '/play';
+    });
+
+    socket.on('game_full', () => {
+        alert("Das Spiel ist bereits voll.");
+        window.location.href = '/full';
+    });
+</script>
 </body>
 </html>

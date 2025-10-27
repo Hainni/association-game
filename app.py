@@ -1,140 +1,236 @@
-from flask import Flask, render_template, redirect, url_for, session
-from flask_socketio import SocketIO, emit
-import random
+from flask import Flask, render_template, redirect, url_for, request as flask_request
+from flask_session import Session
+from flask_socketio import SocketIO, emit, join_room
+import os, random
+import time
+import logging
+logging.getLogger('eventlet.wsgi').setLevel(logging.ERROR)
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'
-socketio = SocketIO(app)
+app.secret_key = 'super_secret_key_123'
 
-# Initialisiere globale Variablen für die Spieler und Antworten
-players = {}
+# Session-Setup (nicht mehr kritisch, aber kann bleiben)
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_FILE_DIR'] = os.path.join(app.root_path, 'flask_session_data')
+app.config['SESSION_PERMANENT'] = False
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_HTTPONLY'] = False
+app.config['SESSION_COOKIE_DOMAIN'] = None
+app.config['SESSION_COOKIE_PATH'] = '/'
+
+Session(app)
+
+@app.after_request
+def add_no_cache_headers(response):
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+# SocketIO Setup
+socketio = SocketIO(app, manage_session=False, cors_allowed_origins="*")
+
+# Globale Variablen
+players = {}          # { sid: {'id': 1, 'name': 'Alice', 'answer': 'Katze'} }
 answers = []
-max_players = 3
+max_players = 2
 current_players = 0
 current_category = None
-global categories
+game_started = False
+categories = []
+used_categories = set()
+ready_players = set()
+game_id = str(int(time.time()))
 
-### HILFSUNKTIONEN ###
+### HILFSFUNKTIONEN ###
 def load_categories():
-    """Lädt Kategorien aus einer Textdatei"""
-    with open('static/categories.txt', 'r', encoding='utf-8') as file:
-        categories = [line.strip() for line in file if line.strip()]
-    return categories
+    path = os.path.join(app.root_path, 'static', 'categories.txt')
+    with open(path, 'r', encoding='utf-8') as file:
+        return [line.strip() for line in file if line.strip()]
 
 def get_new_category():
     global categories, used_categories
-
-    # Prüfe, ob alle Kategorien schon verwendet wurden
     if len(used_categories) == len(categories):
         used_categories.clear()
-
-    # Finde alle Kategorien, die noch übrig sind
-    remaining = [cat for cat in categories if cat not in used_categories]
-
-    # Wähle zufällige neue Kategorie
+    remaining = [c for c in categories if c not in used_categories]
     new_cat = random.choice(remaining)
     used_categories.add(new_cat)
     return new_cat
 
 def reset_game():
-    global players, answers, current_players, current_category
+    global players, answers, current_players, current_category, ready_players, used_categories, game_id
     players.clear()
     answers.clear()
+    ready_players.clear()
+    used_categories.clear()
     current_players = 0
     current_category = None
-
-### ---------------------- ###
+    game_id = str(int(time.time()))
 
 categories = load_categories()
-used_categories = set()
-ready_players = set()
 
 #####################
 ### SOCKET EVENTS ###
 #####################
+
+@socketio.on('connect')
+def on_connect():
+    emit('server_game_id', {'game_id': game_id})
+
 @socketio.on('set_players')
 def set_players(data):
     global max_players, game_started
     max_players = int(data['players'])
     game_started = True
-    emit('player_count', {'current_players': current_players, 'max_players': max_players}, broadcast='/')
+    emit('player_count', {'current_players': current_players, 'max_players': max_players})
+
 
 @socketio.on('join_game')
-def join_game():
-    emit('player_count', {'current_players': current_players, 'max_players': max_players}, broadcast=True)
+def join_game(data):
+    global current_players, players, max_players, game_id
+    emit('server_game_id', {'game_id': game_id})  # <-- send current id
+
+
+    name = data.get('name')
+    reconnect_sid = data.get('reconnect_sid')  # <- kommt vom Client
+    sid = flask_request.sid
+
+    # Prüfen, ob Spieler reconnectet
+    if reconnect_sid and reconnect_sid in players:
+        players[sid] = players.pop(reconnect_sid)
+        print(f"🔄 Spieler {players[sid]['name']} reconnectet (neue SID {sid})")
+        return
+
+
+    # normaler Beitritt
+    if current_players >= max_players:
+        emit('game_full')
+        print(f"🚫 Spiel ist voll: {name}")
+        return
+
+    current_players += 1
+    player_id = current_players
+    player_name = name or f'Spieler{player_id}'
+
+    players[sid] = {'id': player_id, 'name': player_name, 'answer': None}
+    print(f"🔹 Spieler {player_name} beigetreten (ID {player_id}, SID {sid})")
+    print(f"🔹 Aktuelle Spieler: {current_players}/{max_players}")
+
+    socketio.emit('player_count', {
+        'current_players': current_players,
+        'max_players': max_players,
+        'names': [p['name'] for p in players.values()]
+    })
+
+    if len(players) == max_players:
+        global game_started
+        game_started = True
+        print("🚀 Alle Spieler da – Spiel startet!")
+        socketio.emit('start_game')
+
 
 @socketio.on('submit_answer')
 def handle_submit_answer(data):
-    global answers, current_players, current_category
-    player_id = session.get('player_id')
+    sid = flask_request.sid
 
-    # Speichert die Antwort des Spielers, wenn dieser noch keine Antwort abgegeben hat
-    if player_id not in players:
-        players[player_id] = data['answer']
-        answers.append(data['answer'])
+    # Prüfen, ob Spieler bekannt
+    if sid not in players:
+        emit('force_rejoin')  # Client soll neu laden
+        print(f"⚠️ Antwort empfangen, aber unbekannte SID: {sid}")
+        return
 
-    # Prüft, ob alle Spieler geantwortet haben
-    if len(answers) == current_players:
-        # Sendet alle Antworten an alle Clients
+    answer = data['answer']
+    player = players[sid]
+    player['answer'] = answer
+    answers.append({'name': player['name'], 'answer': answer})
+    print(f"📝 Antwort von {player['name']}: {answer}")
+
+    if all(p['answer'] is not None for p in players.values()):
+        print("✅ Alle Antworten abgegeben.")
         socketio.emit('all_answers_submitted', {'answers': answers})
+        socketio.emit('ready_phase_start')
+
 
 @socketio.on('player_ready')
 def handle_player_ready():
-    global ready_players, current_players, current_category, players, answers
+    global ready_players, current_players, current_category
 
-    player_id = session.get('player_id')
-    ready_players.add(player_id)
+    sid = flask_request.sid
+    if sid not in players:
+        print("⚠️ Ready gesendet, aber SID nicht registriert.")
+        return
 
-    # 🟢 Fortschritt an alle senden
+    ready_players.add(sid)
+    player_name = players[sid]['name']
+    print(f"🟢 {player_name} ist bereit ({len(ready_players)}/{current_players})")
+
     socketio.emit('ready_count', {
         'ready': len(ready_players),
-        'total': current_players
+        'total': current_players,
+        'names': [players[s]['name'] for s in ready_players]
     })
 
-    # Wenn alle Spieler bereit sind → neue Runde starten
-    if len(ready_players) == current_players:
-        current_category = get_new_category()
+    if len(ready_players) == len(players):
+        # Antworten zurücksetzen
+        for p in players.values():
+            p['answer'] = None
         answers.clear()
-        players.clear()
-        ready_players.clear()  # Reset für nächste Runde
 
+        # neue Kategorie
+        current_category = get_new_category()
+        print(f"🚀 Neue Kategorie: {current_category}")
+
+        ready_players.clear()
         socketio.emit('new_category', {'category': current_category})
+
+@socketio.on('disconnect')
+def on_disconnect():
+    sid = flask_request.sid
+
+    def remove_if_still_gone():
+        # kleinen Delay gewähren
+        socketio.sleep(2)
+        if sid in players:
+            name = players[sid]['name']
+            del players[sid]
+            print(f"❌ Spieler {name} hat das Spiel verlassen. ({len(players)} verbleibend)")
+            socketio.emit('player_count', {
+                'current_players': len(players),
+                'max_players': max_players,
+                'names': [p['name'] for p in players.values()]
+            })
+            if len(players) == 0:
+                print("🔁 Alle Spieler weg – Spiel zurückgesetzt.")
+                reset_game()
+
+    socketio.start_background_task(remove_if_still_gone)
+
+
 
 ################
 ### ROUTINGS ###
 ################
 @app.route('/')
 def index():
-    global current_players
-    # Wenn die maximale Anzahl an Spielern erreicht ist, zur vollen Seite weiterleiten
+    global game_started, current_players, max_players, game_id
+    if game_started:
+        return redirect(url_for('join'))
     if current_players >= max_players:
         return redirect(url_for('full'))
-    elif current_players == 0:
-        return render_template('index.html')
-    else:
-        return redirect(url_for('join'))
+    return render_template('index.html', game_id=game_id)
 
 @app.route('/join')
 def join():
-    global current_players
-    current_players += 1
-    session['player_id'] = current_players
-
-    # Broadcast an alle Clients über die aktuelle Spieleranzahl
-    socketio.emit('player_count', {'current_players': current_players, 'max_players': max_players}, to='/')
-    
-    return render_template('join.html')
+    return render_template('join.html', game_id=game_id)
 
 @app.route('/play')
 def play():
-    global current_category
-    categories = load_categories()
+    global current_category, game_id
     if current_category is None:
-        # Wähle zufällig eine Kategorie
-        current_category = random.choice(categories)
-        # Sende die Kategorie an alle Clients
-        socketio.emit('category_selected', {'category': current_category}, to='/')
-    return render_template('play.html', category=current_category)
+        current_category = get_new_category()
+        socketio.emit('category_selected', {'category': current_category})
+    return render_template('play.html', category=current_category, game_id=game_id)
 
 @app.route('/full')
 def full():
@@ -142,4 +238,7 @@ def full():
 
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', debug=True)
+    import eventlet
+    import eventlet.wsgi
+    reset_game()
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True)
