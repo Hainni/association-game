@@ -7,17 +7,37 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         body {
-          background: #0B0C2A;
-          color: white;
-          text-align: center;
-          font-family: sans-serif;
-          margin-top: 60px;
+            font-family: Arial, sans-serif;
+            background-color: #000129; /* 💙 Neuer Hintergrund */
+            color: white;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-    
+
+        /* 🖼 Banner-Styling */
+        #banner-container {
+            text-align: center;
+            width: 100%;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        #banner {
+            max-width: 90%;
+            height: auto;
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+        }
+
         h1 { font-size: clamp(1.5rem, 5vw, 2.2rem); }
-    
+
         input[type="text"] {
-          font-size: 16px;          
+          font-size: 16px;
           padding: 10px;
           border-radius: 8px;
           width: 80%;
@@ -26,7 +46,7 @@
           outline: none;
           margin-bottom: 12px;
         }
-    
+
         button {
           background-color: #1E1F5C;
           color: white;
@@ -36,13 +56,18 @@
           cursor: pointer;
           font-size: 16px;
         }
-    
+
         button:hover { background-color: #2B2C6E; }
-    
+
         #waitingRoom { margin-top: 20px; font-size: 1rem; }
     </style>
 </head>
-<body style="background:#0B0C2A; color:white; text-align:center; font-family:sans-serif;">
+<body>
+
+    <!-- 🖼 Banner ganz oben -->
+    <div id="banner-container">
+        <img src="{{ url_for('static', filename='img/banner.png') }}" alt="Das große Assoziationsspiel" id="banner">
+    </div>  
 
 <h1>Spiel beitreten</h1>
 
@@ -84,9 +109,11 @@
         const serverId = data.game_id;
         const storedId = localStorage.getItem("game_id");
         if (storedId && storedId !== serverId) {
-            console.log("⚠️ Alte Session erkannt.");
+            console.log("⚠️ Neues Spiel erkannt (Server-Neustart oder Reset).");
+            alert("Das Spiel wurde beendet. Bitte starte ein neues Spiel.");
             localStorage.clear();
             localStorage.setItem("game_id", serverId);
+            window.location.href = "/";
         }
         });
 

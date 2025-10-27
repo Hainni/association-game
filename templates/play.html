@@ -7,13 +7,31 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
   <style>
     body {
-      background-color: #0B0C2A;
-      color: white;
-      font-family: 'Poppins', sans-serif;
-      text-align: center;
-      margin: 0;
-      padding: 0;
-      overflow-x: hidden;
+        font-family: Arial, sans-serif;
+        background-color: #000129; /* 💙 Neuer Hintergrund */
+        color: white;
+        text-align: center;
+        margin: 0;
+        padding: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    /* 🖼 Banner-Styling */
+    #banner-container {
+        text-align: center;
+        width: 100%;
+        margin-top: 20px;
+        margin-bottom: 10px;
+    }
+
+    #banner {
+        max-width: 90%;
+        height: auto;
+        border-radius: 12px;
+        box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
     }
   
     h1 {
@@ -74,16 +92,22 @@
     #answers ul {
       list-style: none;
       padding: 0;
-      margin: 20px 0 0 0;
+      margin: 15px 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center; /* 💡 sorgt für exakte Zentrierung */
+      width: 100%;
     }
-  
+
+    /* Jede Antwort-Box (li) */
     #answers li {
       background-color: #1E1F5C;
-      border-radius: 10px;
-      margin: 10px auto;
-      width: 80%;
-      padding: 10px;
-      max-width: 500px;
+      border-radius: 12px;
+      margin: 5px 0;
+      width: 85%;
+      max-width: 600px;
+      padding: 14px 16px;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
       word-wrap: break-word;
     }
   
@@ -104,6 +128,10 @@
   </style>    
 </head>
 <body>
+  <div id="banner-container">
+    <img src="{{ url_for('static', filename='img/banner.png') }}" alt="Das große Assoziationsspiel" id="banner">
+  </div>
+  
   <h1>Die Kategorie ist: <span id="category">{{ category }}</span></h1>
   <p>Gib deine Antwort unten ein:</p>
 
@@ -140,11 +168,11 @@
       const serverId = data.game_id;
       const storedId = localStorage.getItem("game_id");
       if (storedId && storedId !== serverId) {
-        console.log("⚠️ Alte Session erkannt, Spiel wurde neugestartet.");
-        alert("Das Spiel wurde neu gestartet. Bitte tritt erneut bei!");
-        localStorage.clear();
-        localStorage.setItem("game_id", serverId);
-        window.location.href = "/join";
+          console.log("⚠️ Neues Spiel erkannt (Server-Neustart oder Reset).");
+          alert("Das Spiel wurde beendet. Bitte starte ein neues Spiel.");
+          localStorage.clear();
+          localStorage.setItem("game_id", serverId);
+          window.location.href = "/";
       }
     });
 

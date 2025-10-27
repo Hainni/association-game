@@ -11,10 +11,30 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            background-color: #0B0C2A;
+            background-color: #000129; /* 💙 Neuer Hintergrund */
             color: white;
             text-align: center;
-            margin-top: 80px;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* 🖼 Banner-Styling */
+        #banner-container {
+            text-align: center;
+            width: 100%;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        #banner {
+            max-width: 90%;
+            height: auto;
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
         }
         h1 {
             font-size: 2em;
@@ -38,7 +58,10 @@
     </style>
 </head>
 <body>
-    <h1>Willkommen zum Association Game!</h1>
+    <div id="banner-container">
+        <img src="{{ url_for('static', filename='img/banner.png') }}" alt="Das große Assoziationsspiel" id="banner">
+      </div>      
+    <h1>Willkommen zum Assoziations-Spiel!</h1>
     <form id="playerForm" style="font-size: 18px; margin-top: 20px;">
         <label for="players">Wie viele Spieler nehmen teil?</label><br>
         <select id="players" name="players" required style="margin: 10px; padding: 5px;">
