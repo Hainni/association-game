@@ -35,10 +35,27 @@
   </div>
 
   <script>
-    // === Socket zuerst erstellen ===
     const socket = io({ withCredentials: true, transports: ['websocket', 'polling'] });
 
-    // === Danach Events anhängen ===
+    // === Allgemeine Events (müssen ganz oben stehen!) ===
+    socket.on("game_aborted", data => {
+      const reason = data.reason || "Ein Spieler hat das Spiel verlassen.";
+      alert(reason + "\nDas Spiel wird neu gestartet.");
+      setTimeout(() => {
+        localStorage.clear();
+        window.location.href = "/";
+      }, 0);
+    });
+
+    socket.on("force_game_reset", () => {
+      alert("Das Spiel wurde zurückgesetzt. Bitte starte ein neues Spiel.");
+      setTimeout(() => {
+        localStorage.clear();
+        window.location.href = "/";
+      }, 0);
+    });
+
+    // === Dann alles andere ===
     socket.on("server_game_id", data => {
       const serverId = data.game_id;
       const storedId = localStorage.getItem("game_id");
@@ -51,13 +68,11 @@
       }
     });
 
-    // === Spieler-Infos aus localStorage laden ===
     const savedName = localStorage.getItem("player_name");
     const savedSid = localStorage.getItem("player_sid");
 
     socket.on("connect", () => {
       localStorage.setItem("player_sid", socket.id);
-      // 🔁 Beim Seiten-Neuladen wieder am Server anmelden
       if (savedName) {
         socket.emit("join_game", { name: savedName, reconnect_sid: savedSid });
         console.log(`🔁 Reconnect an Server: ${savedName}`);
@@ -108,25 +123,24 @@
     });
 
     socket.on("new_category", data => {
-    document.getElementById("category").textContent = data.category;
+      document.getElementById("category").textContent = data.category;
 
-    // Antworten-UI reset
-    answerInput.value = '';
-    answerInput.disabled = false;
-    submitButton.disabled = false;
-    submitButton.style.backgroundColor = '';
+      // Reset UI
+      answerInput.value = '';
+      answerInput.disabled = false;
+      submitButton.disabled = false;
+      submitButton.style.backgroundColor = '';
 
-    // Bereit-UI sauber zurücksetzen
-    readyButton.disabled = false;       // <-- wichtig!
-    readyStatus.textContent = '';       // <-- wichtig!
-    document.getElementById("answers").style.display = "none";
-    readySection.style.display = "none";
-  });
+      readyButton.disabled = false;
+      readyStatus.textContent = '';
+      document.getElementById("answers").style.display = "none";
+      readySection.style.display = "none";
+    });
 
-  socket.on("force_rejoin", () => {
-    alert("Deine Verbindung ist abgelaufen. Bitte tritt neu bei!");
-    window.location.href = "/join";
-  });
+    socket.on("force_rejoin", () => {
+      alert("Deine Verbindung ist abgelaufen. Bitte tritt neu bei!");
+      window.location.href = "/join";
+    });
   </script>
 </body>
 </html>

@@ -59,14 +59,17 @@ def get_new_category():
     return new_cat
 
 def reset_game():
-    global players, answers, current_players, current_category, ready_players, used_categories, game_id
+    global players, answers, current_players, current_category, ready_players, used_categories, game_id, game_started
     players.clear()
     answers.clear()
     ready_players.clear()
     used_categories.clear()
     current_players = 0
     current_category = None
+    game_started = False
     game_id = str(int(time.time()))
+    print("🔄 Spielzustand vollständig zurückgesetzt (neue game_id:", game_id, ")")
+    socketio.emit('force_game_reset') # Broadcast an alle Clients, damit sie zur Startseite gehen
 
 categories = load_categories()
 
@@ -189,18 +192,32 @@ def on_disconnect():
     sid = flask_request.sid
 
     def remove_if_still_gone():
-        # kleinen Delay gewähren
-        socketio.sleep(2)
+        socketio.sleep(1)
+        global current_players
+
         if sid in players:
             name = players[sid]['name']
             del players[sid]
-            print(f"❌ Spieler {name} hat das Spiel verlassen. ({len(players)} verbleibend)")
+            current_players = len(players)
+
+            print(f"❌ Spieler {name} hat das Spiel verlassen. ({current_players} verbleibend)")
+
             socketio.emit('player_count', {
-                'current_players': len(players),
+                'current_players': current_players,
                 'max_players': max_players,
                 'names': [p['name'] for p in players.values()]
             })
-            if len(players) == 0:
+
+            # Wenn Spieler fehlen → Spiel abbrechen und zurücksetzen
+            if current_players < max_players and current_players > 0:
+                print("⚠️ Ein Spieler hat das Spiel verlassen – Spiel wird zurückgesetzt.")
+                # 🔹 ZUERST allen sagen, dass jemand raus ist
+                socketio.emit('game_aborted', {'reason': f'{name} hat das Spiel verlassen.'})
+                socketio.sleep(0.5)
+                # 🔹 Dann Reset durchführen (neue game_id)
+                reset_game()
+
+            elif current_players == 0:
                 print("🔁 Alle Spieler weg – Spiel zurückgesetzt.")
                 reset_game()
 
