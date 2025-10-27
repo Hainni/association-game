@@ -2,8 +2,45 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Beitreten</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+          background: #0B0C2A;
+          color: white;
+          text-align: center;
+          font-family: sans-serif;
+          margin-top: 60px;
+        }
+    
+        h1 { font-size: clamp(1.5rem, 5vw, 2.2rem); }
+    
+        input[type="text"] {
+          font-size: 16px;          
+          padding: 10px;
+          border-radius: 8px;
+          width: 80%;
+          max-width: 300px;
+          border: none;
+          outline: none;
+          margin-bottom: 12px;
+        }
+    
+        button {
+          background-color: #1E1F5C;
+          color: white;
+          padding: 10px 20px;
+          border: none;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 16px;
+        }
+    
+        button:hover { background-color: #2B2C6E; }
+    
+        #waitingRoom { margin-top: 20px; font-size: 1rem; }
+    </style>
 </head>
 <body style="background:#0B0C2A; color:white; text-align:center; font-family:sans-serif;">
 

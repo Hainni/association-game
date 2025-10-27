@@ -2,18 +2,106 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Spiel läuft</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
   <style>
-    body { background-color:#0B0C2A; color:white; font-family:'Poppins',sans-serif; text-align:center; }
-    #category { background-color:#1A1B4B; padding:12px 20px; border-radius:20px; display:inline-block; font-size:1.5em; margin-top:20px; font-weight:bold; }
-    #answers ul { list-style:none; padding:0; }
-    #answers li { background-color:#1E1F5C; border-radius:10px; margin:10px auto; width:60%; padding:10px; }
-    #answers li strong { display:block; color:#FFD700; font-weight:600; }
-    #readyButton { background-color:#4CAF50; color:white; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; }
-    #readyButton:disabled { background-color:#888; }
-  </style>
+    body {
+      background-color: #0B0C2A;
+      color: white;
+      font-family: 'Poppins', sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+  
+    h1 {
+      font-size: clamp(1.2rem, 4vw, 1.8rem);
+      margin-top: 1.4em;
+      margin-bottom: 0.8em;
+      padding: 0 10px;
+      line-height: 1.4;
+      font-weight: 500;
+    }
+  
+    /* Kategorie schön groß und zentriert unter der Überschrift */
+    #category {
+      display: block;
+      background-color: #1A1B4B;
+      padding: 14px 20px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: clamp(1.4rem, 6vw, 2.2rem);
+      max-width: 90%;
+      margin: 10px auto 25px auto;
+      overflow-wrap: break-word;
+      word-break: break-word;
+    }
+  
+    p {
+      margin-top: 10px;
+      font-size: 1rem;
+    }
+  
+    input[type="text"] {
+      width: 80%;
+      max-width: 400px;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      font-size: 1rem;
+      margin-top: 10px;
+      outline: none;
+    }
+  
+    /* mehr Abstand zwischen Input und Button */
+    #submitButton {
+      margin-top: 12px;
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px 22px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+  
+    #submitButton:disabled {
+      background-color: #888;
+    }
+  
+    #answers ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+  
+    #answers li {
+      background-color: #1E1F5C;
+      border-radius: 10px;
+      margin: 10px auto;
+      width: 80%;
+      padding: 10px;
+      max-width: 500px;
+      word-wrap: break-word;
+    }
+  
+    #answers li strong {
+      display: block;
+      color: #FFD700;
+      font-weight: 600;
+    }
+  
+    #readySection {
+      margin-top: 30px;
+    }
+  
+    #readyStatus {
+      margin-top: 10px;
+      font-size: 1rem;
+    }
+  </style>  
 </head>
 <body>
   <h1>Die Kategorie ist: <span id="category">{{ category }}</span></h1>
