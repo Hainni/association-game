@@ -84,6 +84,17 @@
             socket.emit('set_players', { players: players });
             window.location.href = '/join';
         };
+
+        socket.on('redirect_to_join', () => {
+            alert("Ein anderes Spiel läuft bereits. Du wirst dem aktuellen Spiel beitreten.");
+            window.location.href = '/join';
+        });
+
+        // 👂 Wenn ein Spiel gestartet wurde, bevor man selbst klickt:
+        socket.on('game_started_notice', () => {
+            alert("Ein anderes Spiel wurde gerade gestartet. Du wirst dem Spiel beitreten.");
+            window.location.href = '/join';
+        });
     </script>
 </body>
 </html>

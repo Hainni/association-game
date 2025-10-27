@@ -84,9 +84,19 @@ def on_connect():
 @socketio.on('set_players')
 def set_players(data):
     global max_players, game_started
+    if game_started:
+        emit('redirect_to_join')
+        print("⚠️ Ein weiterer Spieler wollte ein neues Spiel starten – Weiterleitung zu Join.")
+        return
+
     max_players = int(data['players'])
     game_started = True
+
+    # 🔔 Alle Clients informieren, dass jetzt ein Spiel läuft
+    socketio.emit('game_started_notice')
+
     emit('player_count', {'current_players': current_players, 'max_players': max_players})
+    print(f"🎮 Neues Spiel gestartet mit {max_players} Spielern.")
 
 
 @socketio.on('join_game')
@@ -231,10 +241,16 @@ def on_disconnect():
 @app.route('/')
 def index():
     global game_started, current_players, max_players, game_id
+    # Wenn bereits ein Spiel läuft → direkt zur Join-Seite
     if game_started:
+        print("➡️ Spiel läuft bereits – leite Besucher zu /join weiter.")
         return redirect(url_for('join'))
+
+    # Wenn Spielerlimit erreicht → zum 'voll'-Screen
     if current_players >= max_players:
         return redirect(url_for('full'))
+
+    # Nur wenn kein Spiel gestartet ist → Startseite anzeigen
     return render_template('index.html', game_id=game_id)
 
 @app.route('/join')

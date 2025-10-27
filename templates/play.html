@@ -19,13 +19,12 @@
     h1 {
       font-size: clamp(1.2rem, 4vw, 1.8rem);
       margin-top: 1.4em;
-      margin-bottom: 0.8em;
+      margin-bottom: 0.4em;
       padding: 0 10px;
       line-height: 1.4;
       font-weight: 500;
     }
   
-    /* Kategorie schön groß und zentriert unter der Überschrift */
     #category {
       display: block;
       background-color: #1A1B4B;
@@ -34,13 +33,15 @@
       font-weight: bold;
       font-size: clamp(1.4rem, 6vw, 2.2rem);
       max-width: 90%;
-      margin: 10px auto 25px auto;
+      margin: 10px auto 20px auto;
       overflow-wrap: break-word;
       word-break: break-word;
     }
   
+    /* Der Text "Gib deine Antwort unten ein" */
     p {
-      margin-top: 10px;
+      margin-top: 0;
+      margin-bottom: 10px;  /* 🔹 näher am Eingabefeld */
       font-size: 1rem;
     }
   
@@ -51,11 +52,9 @@
       border-radius: 10px;
       border: none;
       font-size: 1rem;
-      margin-top: 10px;
       outline: none;
     }
   
-    /* mehr Abstand zwischen Input und Button */
     #submitButton {
       margin-top: 12px;
       background-color: #4CAF50;
@@ -71,10 +70,11 @@
       background-color: #888;
     }
   
+    /* Nur die Liste ohne Überschrift */
     #answers ul {
       list-style: none;
       padding: 0;
-      margin: 0;
+      margin: 20px 0 0 0;
     }
   
     #answers li {
@@ -101,7 +101,7 @@
       margin-top: 10px;
       font-size: 1rem;
     }
-  </style>  
+  </style>    
 </head>
 <body>
   <h1>Die Kategorie ist: <span id="category">{{ category }}</span></h1>
@@ -113,9 +113,8 @@
   </form>
 
   <div id="answers" style="display:none;">
-    <h2>Alle Antworten:</h2>
     <ul id="answerList"></ul>
-  </div>
+  </div>  
 
   <div id="readySection" style="display:none; margin-top:20px;">
     <button id="readyButton">Bereit für nächste Runde</button>
