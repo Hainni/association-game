@@ -54,47 +54,78 @@
     </form>
 
     <script>
-        const serverGameId = "{{ game_id }}";
-        const storedGameId = localStorage.getItem("game_id");
-
-        // Falls das gespeicherte Spiel älter ist -> alles löschen
-        if (storedGameId !== serverGameId) {
-            console.log("🧹 Neues Spiel erkannt – localStorage wird zurückgesetzt.");
+        // Socket initialisieren
+        const socket = io({ withCredentials: true, transports: ['websocket', 'polling'] });
+      
+        const form = document.getElementById('playerForm');
+        const selectEl = document.getElementById('players');
+        const submitBtn = form.querySelector('button');
+      
+        // Formular erstmal sperren, bis Status da ist
+        submitBtn.disabled = true;
+        selectEl.disabled = true;
+      
+        // Serverstatus bei Verbindungsaufbau
+        socket.on('server_status', (data) => {
+          const serverGameId = data.game_id;
+          const started = !!data.game_started;
+      
+          const stored = localStorage.getItem('game_id');
+          if (!stored || stored !== serverGameId) {
             localStorage.clear();
-            localStorage.setItem("game_id", serverGameId);
-        } else {
-            console.log("✅ Gleiches Spiel – localStorage bleibt bestehen.");
-        }
-
-        // Verbindung mit Session-Cookies (für korrekte Spielzuordnung)
-        const socket = io({
-            withCredentials: true,
-            transports: ['websocket', 'polling']
-        });
-
-        document.getElementById('playerForm').onsubmit = function(e) {
-            e.preventDefault();
-            const players = document.getElementById('players').value;
-
-            if (!players) {
-                alert("Bitte Spieleranzahl auswählen!");
-                return;
-            }
-
-            socket.emit('set_players', { players: players });
-            window.location.href = '/join';
-        };
-
-        socket.on('redirect_to_join', () => {
+            localStorage.setItem('game_id', serverGameId);
+          }
+      
+          if (started) {
+            // Schon ein Spiel aktiv -> sofort zu join
             alert("Ein anderes Spiel läuft bereits. Du wirst dem aktuellen Spiel beitreten.");
             window.location.href = '/join';
+            return;
+          }
+      
+          // Kein Spiel aktiv -> Host darf starten
+          submitBtn.disabled = false;
+          selectEl.disabled = false;
         });
-
-        // 👂 Wenn ein Spiel gestartet wurde, bevor man selbst klickt:
+      
+        // Falls währenddessen jemand anders hostet
         socket.on('game_started_notice', () => {
-            alert("Ein anderes Spiel wurde gerade gestartet. Du wirst dem Spiel beitreten.");
-            window.location.href = '/join';
+          alert("Ein anderes Spiel wurde soeben gestartet. Du wirst dem Spiel beitreten.");
+          window.location.href = '/join';
         });
-    </script>
+      
+        // Absenden: erst auf ACK warten, dann navigieren
+        form.onsubmit = (e) => {
+          e.preventDefault();
+          const players = selectEl.value;
+          if (!players) {
+            alert("Bitte Spieleranzahl auswählen!");
+            return;
+          }
+      
+          submitBtn.disabled = true;
+          selectEl.disabled = true;
+      
+          // Mit ACK warten!
+          socket.emit('set_players', { players }, (/* ack not used here */) => {});
+      
+          // Wir hören auf das explizite ACK-Event:
+          socket.once('set_players_ack', (resp) => {
+            if (resp && resp.ok) {
+              window.location.href = '/join';
+            } else {
+              // Jemand anders war schneller -> sauber beitreten
+              alert("Ein anderes Spiel wurde gerade gestartet. Du wirst dem Spiel beitreten.");
+              window.location.href = '/join';
+            }
+          });
+        };
+      
+        // (Optional) alter Fallback vom Server
+        socket.on('redirect_to_join', () => {
+          alert("Ein anderes Spiel läuft bereits. Du wirst dem aktuellen Spiel beitreten.");
+          window.location.href = '/join';
+        });
+      </script>      
 </body>
 </html>

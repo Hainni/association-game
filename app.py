@@ -66,6 +66,7 @@ def reset_game():
     used_categories.clear()
     current_players = 0
     current_category = None
+    max_players = 0
     game_started = False
     game_id = str(int(time.time()))
     print("🔄 Spielzustand vollständig zurückgesetzt (neue game_id:", game_id, ")")
@@ -79,23 +80,33 @@ categories = load_categories()
 
 @socketio.on('connect')
 def on_connect():
-    emit('server_game_id', {'game_id': game_id})
+    emit('server_status', {
+        'game_id': game_id,
+        'game_started': game_started,
+        'current_players': len(players),
+        'max_players': max_players,
+    })
 
 @socketio.on('set_players')
 def set_players(data):
     global max_players, game_started
+
+    # 🧱 Falls bereits ein Spiel läuft, verhindere ein zweites
     if game_started:
-        emit('redirect_to_join')
+        emit('set_players_ack', {'ok': False, 'reason': 'already_started'})
         print("⚠️ Ein weiterer Spieler wollte ein neues Spiel starten – Weiterleitung zu Join.")
         return
 
+    # 🧩 Neues Spiel initialisieren
     max_players = int(data['players'])
     game_started = True
 
-    # 🔔 Alle Clients informieren, dass jetzt ein Spiel läuft
-    socketio.emit('game_started_notice')
+    # ✅ Bestätige dem Host, dass er das Spiel erfolgreich erstellt hat
+    emit('set_players_ack', {'ok': True})
 
-    emit('player_count', {'current_players': current_players, 'max_players': max_players})
+    # 🔔 Informiere nur andere Clients (nicht den Host selbst!)
+    socketio.emit('game_started_notice', to="/", include_self=False)
+
     print(f"🎮 Neues Spiel gestartet mit {max_players} Spielern.")
 
 
@@ -202,37 +213,27 @@ def on_disconnect():
     sid = flask_request.sid
 
     def remove_if_still_gone():
-        socketio.sleep(1)
-        global current_players
-
+        socketio.sleep(2)
         if sid in players:
             name = players[sid]['name']
             del players[sid]
-            current_players = len(players)
+            remaining = len(players)
 
-            print(f"❌ Spieler {name} hat das Spiel verlassen. ({current_players} verbleibend)")
+            print(f"❌ Spieler {name} hat das Spiel verlassen. ({remaining} verbleibend)")
 
-            socketio.emit('player_count', {
-                'current_players': current_players,
-                'max_players': max_players,
-                'names': [p['name'] for p in players.values()]
-            })
-
-            # Wenn Spieler fehlen → Spiel abbrechen und zurücksetzen
-            if current_players < max_players and current_players > 0:
-                print("⚠️ Ein Spieler hat das Spiel verlassen – Spiel wird zurückgesetzt.")
-                # 🔹 ZUERST allen sagen, dass jemand raus ist
-                socketio.emit('game_aborted', {'reason': f'{name} hat das Spiel verlassen.'})
-                socketio.sleep(0.5)
-                # 🔹 Dann Reset durchführen (neue game_id)
+            # Wenn noch Spieler übrig sind → Spiel abbrechen und Reset nur einmal senden
+            if remaining > 0:
+                socketio.emit('game_aborted', {
+                    'reason': f"{name} hat das Spiel verlassen. Bitte starte ein neues Spiel."
+                })
                 reset_game()
-
-            elif current_players == 0:
-                print("🔁 Alle Spieler weg – Spiel zurückgesetzt.")
+                print("⚠️ Ein Spieler hat das Spiel verlassen – Spiel wird zurückgesetzt.")
+            else:
+                # Wenn keiner mehr da ist, kein weiterer Alert nötig
+                print("🔁 Alle Spieler weg – Spiel vollständig zurückgesetzt.")
                 reset_game()
 
     socketio.start_background_task(remove_if_still_gone)
-
 
 
 ################
@@ -242,7 +243,7 @@ def on_disconnect():
 def index():
     global game_started, current_players, max_players, game_id
     # Wenn bereits ein Spiel läuft → direkt zur Join-Seite
-    if game_started:
+    if game_started and current_players > 0:
         print("➡️ Spiel läuft bereits – leite Besucher zu /join weiter.")
         return redirect(url_for('join'))
 

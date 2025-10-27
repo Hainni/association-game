@@ -126,21 +126,14 @@
 
     // === Allgemeine Events (müssen ganz oben stehen!) ===
     socket.on("game_aborted", data => {
-      const reason = data.reason || "Ein Spieler hat das Spiel verlassen.";
-      alert(reason + "\nDas Spiel wird neu gestartet.");
+      const reason = data.reason || "Ein Spieler hat das Spiel verlassen. Bitte starte ein neues Spiel.";
+      alert(reason);
       setTimeout(() => {
         localStorage.clear();
         window.location.href = "/";
       }, 0);
     });
 
-    socket.on("force_game_reset", () => {
-      alert("Das Spiel wurde zurückgesetzt. Bitte starte ein neues Spiel.");
-      setTimeout(() => {
-        localStorage.clear();
-        window.location.href = "/";
-      }, 0);
-    });
 
     // === Dann alles andere ===
     socket.on("server_game_id", data => {
