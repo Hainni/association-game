@@ -297,11 +297,15 @@
       roundDisplay.textContent = data.round;
       document.getElementById("totalRounds").textContent = data.total_rounds;
 
+      // 🧩 Eingabefeld sichtbar und bereit machen
+      const answerForm = document.getElementById("answerForm");
+      answerForm.style.display = "block";
       answerInput.value = '';
       answerInput.disabled = false;
       submitButton.disabled = false;
       submitButton.style.backgroundColor = '';
 
+      // 🔁 Anzeige zurücksetzen
       readyButton.classList.remove("active");
       correctButton.classList.remove("active");
       readyStatus.textContent = '';
@@ -335,6 +339,20 @@
       document.getElementById("category").textContent = data.category || "–";
       const me = localStorage.getItem("player_name");
       document.getElementById("points").textContent = data.points[me] || 0;
+
+      // Wenn Spieler in Ergebnisphase reloadet:
+      if (data.phase === "results" && data.answers.length > 0) {
+        const answerList = document.getElementById("answerList");
+        answerList.innerHTML = '';
+        data.answers.forEach(entry => {
+          const li = document.createElement("li");
+          li.innerHTML = `<strong>${entry.name}</strong><br>${entry.answer}`;
+          answerList.appendChild(li);
+        });
+        document.getElementById("answers").style.display = "block";
+        document.getElementById("answerForm").style.display = "none";
+        document.getElementById("readySection").style.display = "block";
+      }
     });
   </script>
 </body>

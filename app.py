@@ -8,7 +8,7 @@ logging.getLogger('eventlet.wsgi').setLevel(logging.ERROR)
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_123'
 
-# Session-Setup
+# Session-Konfiguration
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_FILE_DIR'] = os.path.join(app.root_path, 'flask_session_data')
 app.config['SESSION_PERMANENT'] = False
@@ -22,11 +22,11 @@ def add_no_cache_headers(response):
     response.headers["Expires"] = "0"
     return response
 
-# SocketIO
+# SocketIO Setup
 socketio = SocketIO(app, manage_session=False, cors_allowed_origins="*")
 
 # --- Globale Variablen ---
-players = {}          
+players = {}
 answers = []
 ready_players = set()
 categories = []
@@ -39,6 +39,7 @@ max_rounds = 10
 current_round = 1
 points = {}
 game_id = str(int(time.time()))
+game_phase = "answering"  # "answering", "results", "ready"
 
 STATE_FILE = os.path.join(app.root_path, "game_state.json")
 
@@ -66,14 +67,18 @@ def save_state():
         "used_categories": list(used_categories),
         "current_category": current_category,
         "points": points,
+        "game_phase": game_phase,
+        "answers": answers if game_phase == "results" else [],
     }
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f)
-    print("💾 Zustand gespeichert.")
+    print("💾 Zustand gespeichert (Phase:", game_phase, ")")
 
 def load_state():
     """Lädt gespeicherten Zustand"""
-    global game_id, current_round, max_rounds, used_categories, current_category, points
+    global game_id, current_round, max_rounds, used_categories
+    global current_category, points, game_phase, answers
+
     if os.path.exists(STATE_FILE):
         with open(STATE_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -83,13 +88,15 @@ def load_state():
         used_categories = set(data.get("used_categories", []))
         current_category = data.get("current_category", None)
         points = data.get("points", {})
+        game_phase = data.get("game_phase", "answering")
+        answers = data.get("answers", [])
         print("🔁 Gespeicherter Zustand geladen:", data)
 
 def reset_game():
     """Setzt den gesamten Spielzustand zurück"""
     global players, answers, ready_players, used_categories
     global current_players, current_category, game_started, max_players
-    global current_round, points, game_id
+    global current_round, points, game_id, game_phase
 
     players.clear()
     answers.clear()
@@ -101,6 +108,7 @@ def reset_game():
     game_started = False
     current_round = 1
     points = {}
+    game_phase = "answering"
     game_id = str(int(time.time()))
 
     if os.path.exists(STATE_FILE):
@@ -123,16 +131,34 @@ def on_connect():
 
 @socketio.on('set_players')
 def set_players(data):
-    global max_players, game_started
+    global max_players, game_started, max_rounds
+    global current_round, used_categories, game_phase
+
+    # 🧼 Reset, falls vorherige Daten noch gespeichert waren
+    current_round = 1
+    used_categories.clear()
+    game_phase = "answering"
+    if os.path.exists(STATE_FILE):
+        os.remove(STATE_FILE)
+        print("🧹 Alter Spielstand gelöscht – neues Spiel startet bei Runde 1.")
+
+    # 🚫 Falls schon ein anderes Spiel läuft
     if game_started:
         emit('set_players_ack', {'ok': False, 'reason': 'already_started'})
+        print("⚠️ Ein weiterer Spieler wollte ein neues Spiel starten – abgelehnt.")
         return
 
+    # 🎮 Neues Spiel initialisieren
     max_players = int(data['players'])
+    max_rounds = int(data.get('rounds', 10))
     game_started = True
+
+    # ✅ Host bestätigen
     emit('set_players_ack', {'ok': True})
+    # 🔔 Alle anderen informieren
     socketio.emit('game_started_notice', include_self=False)
-    print(f"🎮 Neues Spiel gestartet mit {max_players} Spielern.")
+
+    print(f"🎮 Neues Spiel gestartet mit {max_players} Spielern und {max_rounds} Runden (Runde 1).")
 
 @socketio.on('join_game')
 def join_game(data):
@@ -148,7 +174,9 @@ def join_game(data):
             'round': current_round,
             'total_rounds': max_rounds,
             'category': current_category,
-            'points': points
+            'points': points,
+            'phase': game_phase,
+            'answers': answers if game_phase == "results" else []
         }, room=sid)
         return
 
@@ -179,23 +207,33 @@ def join_game(data):
 
 @socketio.on('submit_answer')
 def submit_answer(data):
+    global game_phase
     sid = flask_request.sid
     if sid not in players:
         emit('force_rejoin')
+        return
+
+    # Falls in Ergebnisphase reloadet wurde → keine erneute Antwort zulassen
+    if game_phase != "answering":
+        emit('info', {'msg': 'Antwortphase bereits beendet!'})
         return
 
     answer = data['answer']
     player = players[sid]
     player['answer'] = answer
     answers.append({'name': player['name'], 'answer': answer})
+    print(f"📝 Antwort von {player['name']}: {answer}")
 
     if all(p['answer'] for p in players.values()):
+        game_phase = "results"
+        print("✅ Alle Antworten abgegeben → Ergebnisphase startet.")
         socketio.emit('all_answers_submitted', {'answers': answers})
         socketio.emit('ready_phase_start')
+        save_state()
 
 @socketio.on('player_ready')
 def handle_player_ready():
-    global ready_players, current_category, current_round
+    global ready_players, current_category, current_round, game_phase
 
     sid = flask_request.sid
     if sid not in players:
@@ -209,15 +247,15 @@ def handle_player_ready():
     })
 
     if len(ready_players) == len(players):
+        # Nächste Runde vorbereiten
         for p in players.values():
             p['answer'] = None
         answers.clear()
-
         current_category = get_new_category()
         if current_round < max_rounds:
             current_round += 1
-
         ready_players.clear()
+        game_phase = "answering"
 
         socketio.emit('new_category', {
             'category': current_category,
@@ -244,9 +282,6 @@ def on_disconnect():
 # --- Routen ---
 @app.route('/')
 def index():
-    global game_started, current_players, max_players, game_id
-    print(f"[DEBUG] game_started={game_started}, current_players={current_players}, max_players={max_players}")
-
     if game_started and current_players > 0:
         return redirect(url_for('join'))
     if max_players and current_players >= max_players:
