@@ -1,23 +1,17 @@
 from flask import Flask, render_template, redirect, url_for, request as flask_request
 from flask_session import Session
-from flask_socketio import SocketIO, emit, join_room
-import os, random
-import time
-import logging
+from flask_socketio import SocketIO, emit
+import os, random, time, json, logging
+
 logging.getLogger('eventlet.wsgi').setLevel(logging.ERROR)
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_123'
 
-# Session-Setup (nicht mehr kritisch, aber kann bleiben)
+# Session-Setup
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['SESSION_FILE_DIR'] = os.path.join(app.root_path, 'flask_session_data')
 app.config['SESSION_PERMANENT'] = False
-app.config['SESSION_COOKIE_SAMESITE'] = 'None'
-app.config['SESSION_COOKIE_SECURE'] = False
-app.config['SESSION_COOKIE_HTTPONLY'] = False
-app.config['SESSION_COOKIE_DOMAIN'] = None
-app.config['SESSION_COOKIE_PATH'] = '/'
 
 Session(app)
 
@@ -28,26 +22,31 @@ def add_no_cache_headers(response):
     response.headers["Expires"] = "0"
     return response
 
-# SocketIO Setup
+# SocketIO
 socketio = SocketIO(app, manage_session=False, cors_allowed_origins="*")
 
-# Globale Variablen
-players = {}          # { sid: {'id': 1, 'name': 'Alice', 'answer': 'Katze'} }
+# --- Globale Variablen ---
+players = {}          
 answers = []
-max_players = 2
-current_players = 0
-current_category = None
-game_started = False
+ready_players = set()
 categories = []
 used_categories = set()
-ready_players = set()
+game_started = False
+current_players = 0
+max_players = None
+current_category = None
+max_rounds = 10
+current_round = 1
+points = {}
 game_id = str(int(time.time()))
 
-### HILFSFUNKTIONEN ###
+STATE_FILE = os.path.join(app.root_path, "game_state.json")
+
+# --- Hilfsfunktionen ---
 def load_categories():
     path = os.path.join(app.root_path, 'static', 'categories.txt')
-    with open(path, 'r', encoding='utf-8') as file:
-        return [line.strip() for line in file if line.strip()]
+    with open(path, 'r', encoding='utf-8') as f:
+        return [line.strip() for line in f if line.strip()]
 
 def get_new_category():
     global categories, used_categories
@@ -58,88 +57,114 @@ def get_new_category():
     used_categories.add(new_cat)
     return new_cat
 
+def save_state():
+    """Speichert aktuellen Spielzustand"""
+    data = {
+        "game_id": game_id,
+        "current_round": current_round,
+        "max_rounds": max_rounds,
+        "used_categories": list(used_categories),
+        "current_category": current_category,
+        "points": points,
+    }
+    with open(STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+    print("💾 Zustand gespeichert.")
+
+def load_state():
+    """Lädt gespeicherten Zustand"""
+    global game_id, current_round, max_rounds, used_categories, current_category, points
+    if os.path.exists(STATE_FILE):
+        with open(STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        game_id = data.get("game_id", game_id)
+        current_round = data.get("current_round", 1)
+        max_rounds = data.get("max_rounds", 10)
+        used_categories = set(data.get("used_categories", []))
+        current_category = data.get("current_category", None)
+        points = data.get("points", {})
+        print("🔁 Gespeicherter Zustand geladen:", data)
+
 def reset_game():
-    global players, answers, current_players, current_category, ready_players, used_categories, game_id, game_started
+    """Setzt den gesamten Spielzustand zurück"""
+    global players, answers, ready_players, used_categories
+    global current_players, current_category, game_started, max_players
+    global current_round, points, game_id
+
     players.clear()
     answers.clear()
     ready_players.clear()
     used_categories.clear()
     current_players = 0
     current_category = None
-    max_players = 0
+    max_players = None
     game_started = False
+    current_round = 1
+    points = {}
     game_id = str(int(time.time()))
+
+    if os.path.exists(STATE_FILE):
+        os.remove(STATE_FILE)
+
     print("🔄 Spielzustand vollständig zurückgesetzt (neue game_id:", game_id, ")")
-    socketio.emit('force_game_reset') # Broadcast an alle Clients, damit sie zur Startseite gehen
+    socketio.emit('force_game_reset')
 
 categories = load_categories()
 
-#####################
-### SOCKET EVENTS ###
-#####################
-
+# --- Socket Events ---
 @socketio.on('connect')
 def on_connect():
     emit('server_status', {
         'game_id': game_id,
         'game_started': game_started,
         'current_players': len(players),
-        'max_players': max_players,
+        'max_players': max_players or 0,
     })
 
 @socketio.on('set_players')
 def set_players(data):
     global max_players, game_started
-
-    # 🧱 Falls bereits ein Spiel läuft, verhindere ein zweites
     if game_started:
         emit('set_players_ack', {'ok': False, 'reason': 'already_started'})
-        print("⚠️ Ein weiterer Spieler wollte ein neues Spiel starten – Weiterleitung zu Join.")
         return
 
-    # 🧩 Neues Spiel initialisieren
     max_players = int(data['players'])
     game_started = True
-
-    # ✅ Bestätige dem Host, dass er das Spiel erfolgreich erstellt hat
     emit('set_players_ack', {'ok': True})
-
-    # 🔔 Informiere nur andere Clients (nicht den Host selbst!)
-    socketio.emit('game_started_notice', to="/", include_self=False)
-
+    socketio.emit('game_started_notice', include_self=False)
     print(f"🎮 Neues Spiel gestartet mit {max_players} Spielern.")
-
 
 @socketio.on('join_game')
 def join_game(data):
-    global current_players, players, max_players, game_id
-    emit('server_game_id', {'game_id': game_id})  # <-- send current id
-
-
+    global current_players, players, game_started
     name = data.get('name')
-    reconnect_sid = data.get('reconnect_sid')  # <- kommt vom Client
+    reconnect_sid = data.get('reconnect_sid')
     sid = flask_request.sid
 
-    # Prüfen, ob Spieler reconnectet
     if reconnect_sid and reconnect_sid in players:
         players[sid] = players.pop(reconnect_sid)
-        print(f"🔄 Spieler {players[sid]['name']} reconnectet (neue SID {sid})")
+        print(f"🔁 {players[sid]['name']} reconnectet (neue SID {sid})")
+        emit('sync_state', {
+            'round': current_round,
+            'total_rounds': max_rounds,
+            'category': current_category,
+            'points': points
+        }, room=sid)
         return
 
+    if max_players is None:
+        emit('force_rejoin')
+        return
 
-    # normaler Beitritt
     if current_players >= max_players:
         emit('game_full')
-        print(f"🚫 Spiel ist voll: {name}")
         return
 
     current_players += 1
     player_id = current_players
     player_name = name or f'Spieler{player_id}'
-
     players[sid] = {'id': player_id, 'name': player_name, 'answer': None}
-    print(f"🔹 Spieler {player_name} beigetreten (ID {player_id}, SID {sid})")
-    print(f"🔹 Aktuelle Spieler: {current_players}/{max_players}")
+    points[player_name] = points.get(player_name, 0)
 
     socketio.emit('player_count', {
         'current_players': current_players,
@@ -148,110 +173,84 @@ def join_game(data):
     })
 
     if len(players) == max_players:
-        global game_started
-        game_started = True
         print("🚀 Alle Spieler da – Spiel startet!")
         socketio.emit('start_game')
-
+        save_state()
 
 @socketio.on('submit_answer')
-def handle_submit_answer(data):
+def submit_answer(data):
     sid = flask_request.sid
-
-    # Prüfen, ob Spieler bekannt
     if sid not in players:
-        emit('force_rejoin')  # Client soll neu laden
-        print(f"⚠️ Antwort empfangen, aber unbekannte SID: {sid}")
+        emit('force_rejoin')
         return
 
     answer = data['answer']
     player = players[sid]
     player['answer'] = answer
     answers.append({'name': player['name'], 'answer': answer})
-    print(f"📝 Antwort von {player['name']}: {answer}")
 
-    if all(p['answer'] is not None for p in players.values()):
-        print("✅ Alle Antworten abgegeben.")
+    if all(p['answer'] for p in players.values()):
         socketio.emit('all_answers_submitted', {'answers': answers})
         socketio.emit('ready_phase_start')
 
-
 @socketio.on('player_ready')
 def handle_player_ready():
-    global ready_players, current_players, current_category
+    global ready_players, current_category, current_round
 
     sid = flask_request.sid
     if sid not in players:
-        print("⚠️ Ready gesendet, aber SID nicht registriert.")
         return
 
     ready_players.add(sid)
-    player_name = players[sid]['name']
-    print(f"🟢 {player_name} ist bereit ({len(ready_players)}/{current_players})")
-
     socketio.emit('ready_count', {
         'ready': len(ready_players),
-        'total': current_players,
+        'total': len(players),
         'names': [players[s]['name'] for s in ready_players]
     })
 
     if len(ready_players) == len(players):
-        # Antworten zurücksetzen
         for p in players.values():
             p['answer'] = None
         answers.clear()
 
-        # neue Kategorie
         current_category = get_new_category()
-        print(f"🚀 Neue Kategorie: {current_category}")
+        if current_round < max_rounds:
+            current_round += 1
 
         ready_players.clear()
-        socketio.emit('new_category', {'category': current_category})
+
+        socketio.emit('new_category', {
+            'category': current_category,
+            'round': current_round,
+            'total_rounds': max_rounds
+        })
+        save_state()
 
 @socketio.on('disconnect')
 def on_disconnect():
     sid = flask_request.sid
-
-    def remove_if_still_gone():
+    def cleanup():
         socketio.sleep(2)
         if sid in players:
             name = players[sid]['name']
             del players[sid]
             remaining = len(players)
-
-            print(f"❌ Spieler {name} hat das Spiel verlassen. ({remaining} verbleibend)")
-
-            # Wenn noch Spieler übrig sind → Spiel abbrechen und Reset nur einmal senden
+            print(f"❌ {name} hat das Spiel verlassen. ({remaining} verbleibend)")
             if remaining > 0:
-                socketio.emit('game_aborted', {
-                    'reason': f"{name} hat das Spiel verlassen. Bitte starte ein neues Spiel."
-                })
-                reset_game()
-                print("⚠️ Ein Spieler hat das Spiel verlassen – Spiel wird zurückgesetzt.")
-            else:
-                # Wenn keiner mehr da ist, kein weiterer Alert nötig
-                print("🔁 Alle Spieler weg – Spiel vollständig zurückgesetzt.")
-                reset_game()
+                socketio.emit('game_aborted', {'reason': f"{name} hat das Spiel verlassen. Bitte starte ein neues Spiel."})
+            reset_game()
+    socketio.start_background_task(cleanup)
 
-    socketio.start_background_task(remove_if_still_gone)
-
-
-################
-### ROUTINGS ###
-################
+# --- Routen ---
 @app.route('/')
 def index():
     global game_started, current_players, max_players, game_id
-    # Wenn bereits ein Spiel läuft → direkt zur Join-Seite
+    print(f"[DEBUG] game_started={game_started}, current_players={current_players}, max_players={max_players}")
+
     if game_started and current_players > 0:
-        print("➡️ Spiel läuft bereits – leite Besucher zu /join weiter.")
         return redirect(url_for('join'))
-
-    # Wenn Spielerlimit erreicht → zum 'voll'-Screen
-    if current_players >= max_players:
+    if max_players and current_players >= max_players:
         return redirect(url_for('full'))
-
-    # Nur wenn kein Spiel gestartet ist → Startseite anzeigen
     return render_template('index.html', game_id=game_id)
 
 @app.route('/join')
@@ -260,19 +259,16 @@ def join():
 
 @app.route('/play')
 def play():
-    global current_category, game_id
+    global current_category
     if current_category is None:
         current_category = get_new_category()
-        socketio.emit('category_selected', {'category': current_category})
     return render_template('play.html', category=current_category, game_id=game_id)
 
 @app.route('/full')
 def full():
     return render_template('full.html')
 
-
 if __name__ == '__main__':
     import eventlet
-    import eventlet.wsgi
-    reset_game()
+    load_state()
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)

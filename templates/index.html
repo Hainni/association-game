@@ -77,6 +77,7 @@
       </div>      
     <h1>Willkommen zum Assoziations-Spiel!</h1>
     <form id="playerForm" style="font-size: 18px; margin-top: 20px;">
+        <!-- Spieleranzahl -->
         <label for="players">Wie viele Spieler nehmen teil?</label><br>
         <select id="players" name="players" required style="margin: 10px; padding: 5px;">
             <option value="" disabled selected>Bitte wählen</option>
@@ -86,7 +87,18 @@
             <option value="5">5 Spieler</option>
             <option value="6">6 Spieler</option>
         </select>
+
+        <!-- Rundenzahl -->
         <br>
+        <label for="rounds">Wie viele Runden sollen gespielt werden?</label><br>
+        <select id="rounds" name="rounds" required style="margin: 10px; padding: 5px;">
+            <option value="" disabled selected>Bitte wählen</option>
+            <option value="10">10 Runden</option>
+            <option value="15">15 Runden</option>
+            <option value="20">20 Runden</option>
+        </select>
+
+        <br><br>
         <button type="submit">Spiel starten</button>
     </form>
 
@@ -95,12 +107,14 @@
         const socket = io({ withCredentials: true, transports: ['websocket', 'polling'] });
       
         const form = document.getElementById('playerForm');
-        const selectEl = document.getElementById('players');
+        const selectPlayers = document.getElementById('players');
+        const selectRounds = document.getElementById('rounds');
         const submitBtn = form.querySelector('button');
       
-        // Formular erstmal sperren, bis Status da ist
+        // Formular erstmal sperren, bis Serverstatus da ist
         submitBtn.disabled = true;
-        selectEl.disabled = true;
+        selectPlayers.disabled = true;
+        selectRounds.disabled = true;
       
         // Serverstatus bei Verbindungsaufbau
         socket.on('server_status', (data) => {
@@ -122,7 +136,8 @@
       
           // Kein Spiel aktiv -> Host darf starten
           submitBtn.disabled = false;
-          selectEl.disabled = false;
+          selectPlayers.disabled = false;
+          selectRounds.disabled = false;
         });
       
         // Falls währenddessen jemand anders hostet
@@ -134,31 +149,34 @@
         // Absenden: erst auf ACK warten, dann navigieren
         form.onsubmit = (e) => {
           e.preventDefault();
-          const players = selectEl.value;
-          if (!players) {
-            alert("Bitte Spieleranzahl auswählen!");
+          const players = selectPlayers.value;
+          const rounds = selectRounds.value;
+
+          if (!players || !rounds) {
+            alert("Bitte Spieler- und Rundenzahl auswählen!");
             return;
           }
       
           submitBtn.disabled = true;
-          selectEl.disabled = true;
+          selectPlayers.disabled = true;
+          selectRounds.disabled = true;
       
-          // Mit ACK warten!
-          socket.emit('set_players', { players }, (/* ack not used here */) => {});
+          socket.emit('set_players', { players, rounds });
       
-          // Wir hören auf das explizite ACK-Event:
+          // Auf Bestätigung warten
           socket.once('set_players_ack', (resp) => {
             if (resp && resp.ok) {
+              localStorage.setItem("total_rounds", rounds);
+              localStorage.setItem("current_round", 1);
               window.location.href = '/join';
             } else {
-              // Jemand anders war schneller -> sauber beitreten
               alert("Ein anderes Spiel wurde gerade gestartet. Du wirst dem Spiel beitreten.");
               window.location.href = '/join';
             }
           });
         };
       
-        // (Optional) alter Fallback vom Server
+        // Fallback
         socket.on('redirect_to_join', () => {
           alert("Ein anderes Spiel läuft bereits. Du wirst dem aktuellen Spiel beitreten.");
           window.location.href = '/join';

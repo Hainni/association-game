@@ -5,59 +5,75 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Spiel läuft</title>
 
-  <!-- 🟣 PWA-Integration -->
-    <link rel="apple-touch-icon" href="/static/img/icon_512.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="/static/img/icon_192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="/static/img/icon_512.png">
-    <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#000129">
-    <script>
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/static/serviceWorker.js')
-          .then(() => console.log("✅ Service Worker aktiv"))
-          .catch(err => console.error("❌ SW Fehler:", err));
-      }
-    </script>
+  <!-- 🟣 PWA -->
+  <link rel="apple-touch-icon" href="/static/img/icon_512.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/img/icon_192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/static/img/icon_512.png">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#000129">
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/static/serviceWorker.js')
+        .then(() => console.log("✅ Service Worker aktiv"))
+        .catch(err => console.error("❌ SW Fehler:", err));
+    }
+  </script>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+
   <style>
     body {
-        font-family: Arial, sans-serif;
-        background-color: #000129; /* 💙 Neuer Hintergrund */
-        color: white;
-        text-align: center;
-        margin: 0;
-        padding: 0;
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
+      font-family: Arial, sans-serif;
+      background-color: #000129;
+      color: white;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
-    /* 🖼 Banner-Styling */
     #banner-container {
-        text-align: center;
-        width: 100%;
-        margin-top: 20px;
-        margin-bottom: 10px;
+      text-align: center;
+      width: 100%;
+      margin-top: 20px;
+      margin-bottom: 10px;
     }
 
     #banner {
-        max-width: 90%;
-        height: auto;
-        border-radius: 12px;
-        box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+      max-width: 90%;
+      height: auto;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
     }
-  
+
     h1 {
-      font-size: clamp(1.2rem, 4vw, 1.8rem);
-      margin-top: 1.4em;
+      font-size: clamp(1.3rem, 4vw, 1.8rem);
+      margin-top: 1em;
       margin-bottom: 0.4em;
       padding: 0 10px;
-      line-height: 1.4;
-      font-weight: 500;
+      font-weight: 600;
     }
-  
+
+    #scoreboard {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 15px;
+    }
+
+    #scoreboard div {
+      background-color: #1E1F5C;
+      padding: 8px 16px;
+      border-radius: 20px;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+      font-weight: 600;
+    }
+
     #category {
       display: block;
       background-color: #1A1B4B;
@@ -68,16 +84,8 @@
       max-width: 90%;
       margin: 10px auto 20px auto;
       overflow-wrap: break-word;
-      word-break: break-word;
     }
-  
-    /* Der Text "Gib deine Antwort unten ein" */
-    p {
-      margin-top: 0;
-      margin-bottom: 10px;  /* 🔹 näher am Eingabefeld */
-      font-size: 1rem;
-    }
-  
+
     input[type="text"] {
       width: 80%;
       max-width: 400px;
@@ -87,7 +95,7 @@
       font-size: 1rem;
       outline: none;
     }
-  
+
     #submitButton {
       margin-top: 12px;
       background-color: #4CAF50;
@@ -98,23 +106,19 @@
       cursor: pointer;
       font-size: 1rem;
     }
-  
-    #submitButton:disabled {
-      background-color: #888;
-    }
-  
-    /* Nur die Liste ohne Überschrift */
+
+    #submitButton:disabled { background-color: #888; }
+
     #answers ul {
       list-style: none;
       padding: 0;
-      margin: 15px 0 auto;
+      margin: 15px 0;
       display: flex;
       flex-direction: column;
-      align-items: center; /* 💡 sorgt für exakte Zentrierung */
+      align-items: center;
       width: 100%;
     }
 
-    /* Jede Antwort-Box (li) */
     #answers li {
       background-color: #1E1F5C;
       border-radius: 12px;
@@ -125,29 +129,62 @@
       box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
       word-wrap: break-word;
     }
-  
-    #answers li strong {
-      display: block;
-      color: #FFD700;
-      font-weight: 600;
-    }
-  
+
+    #answers li strong { color: #FFD700; display: block; }
+
     #readySection {
+      display: none;
       margin-top: 30px;
+      margin-bottom: 20px;
     }
-  
+
+    #buttonRow {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      background-color: #1E1F5C;
+      color: white;
+      border: none;
+      border-radius: 14px;
+      padding: 12px 24px;
+      font-size: 1rem;
+      cursor: pointer;
+      font-weight: 600;
+      box-shadow: 0 0 10px rgba(255,255,255,0.1);
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      background-color: #2B2C6E;
+      transform: translateY(-1px);
+    }
+
+    .action-btn.active {
+      background-color: #4CAF50;
+      box-shadow: 0 0 15px rgba(76, 175, 80, 0.6);
+    }
+
     #readyStatus {
       margin-top: 10px;
       font-size: 1rem;
     }
-  </style>    
+  </style>
 </head>
 <body>
   <div id="banner-container">
     <img src="{{ url_for('static', filename='img/banner.png') }}" alt="Das große Assoziationsspiel" id="banner">
   </div>
-  
-  <h1>Die Kategorie ist: <span id="category">{{ category }}</span></h1>
+
+  <div id="scoreboard">
+    <div>Punkte: <span id="points">0</span></div>
+    <div>Runde <span id="round">1</span>/<span id="totalRounds">10</span></div>
+  </div>
+
+  <h1><span id="category">{{ category }}</span></h1>
   <p>Gib deine Antwort unten ein:</p>
 
   <form id="answerForm">
@@ -157,60 +194,58 @@
 
   <div id="answers" style="display:none;">
     <ul id="answerList"></ul>
-  </div>  
+  </div>
 
-  <div id="readySection" style="display:none; margin-top:20px;">
-    <button id="readyButton">Bereit für nächste Runde</button>
+  <div id="readySection">
+    <div id="buttonRow">
+      <button id="readyButton" class="action-btn">Bereit</button>
+      <button id="correctButton" class="action-btn">Richtig</button>
+    </div>
     <p id="readyStatus"></p>
   </div>
 
   <script>
     const socket = io({ withCredentials: true, transports: ['websocket', 'polling'] });
 
-    // === Allgemeine Events (müssen ganz oben stehen!) ===
-    socket.on("game_aborted", data => {
-      const reason = data.reason || "Ein Spieler hat das Spiel verlassen. Bitte starte ein neues Spiel.";
-      alert(reason);
-      setTimeout(() => {
-        localStorage.clear();
-        window.location.href = "/";
-      }, 0);
-    });
-
-
-    // === Dann alles andere ===
-    socket.on("server_game_id", data => {
-      const serverId = data.game_id;
-      const storedId = localStorage.getItem("game_id");
-      if (storedId && storedId !== serverId) {
-          console.log("⚠️ Neues Spiel erkannt (Server-Neustart oder Reset).");
-          alert("Das Spiel wurde beendet. Bitte starte ein neues Spiel.");
-          localStorage.clear();
-          localStorage.setItem("game_id", serverId);
-          window.location.href = "/";
-      }
-    });
+    // Standardwerte laden
+    const totalRounds = localStorage.getItem("total_rounds") || 10;
+    document.getElementById("totalRounds").textContent = totalRounds;
 
     const savedName = localStorage.getItem("player_name");
     const savedSid = localStorage.getItem("player_sid");
 
+    // === Verbindung & Reconnect ===
     socket.on("connect", () => {
       localStorage.setItem("player_sid", socket.id);
       if (savedName) {
         socket.emit("join_game", { name: savedName, reconnect_sid: savedSid });
-        console.log(`🔁 Reconnect an Server: ${savedName}`);
       }
     });
 
-    // === Spiellogik ===
+    socket.on("server_game_id", data => {
+      const serverId = data.game_id;
+      const storedId = localStorage.getItem("game_id");
+      if (storedId && storedId !== serverId) {
+        alert("Das Spiel wurde beendet. Bitte starte ein neues Spiel.");
+        localStorage.clear();
+        localStorage.setItem("game_id", serverId);
+        window.location.href = "/";
+      }
+    });
+
+    // === DOM-Elemente ===
     const answerForm = document.getElementById("answerForm");
     const answerInput = document.getElementById("answerInput");
     const submitButton = document.getElementById("submitButton");
-    const readySection = document.getElementById("readySection");
     const readyButton = document.getElementById("readyButton");
+    const correctButton = document.getElementById("correctButton");
     const readyStatus = document.getElementById("readyStatus");
     const answerList = document.getElementById("answerList");
+    const pointsDisplay = document.getElementById("points");
+    const roundDisplay = document.getElementById("round");
+    const readySection = document.getElementById("readySection");
 
+    // === Antwort senden ===
     answerForm.onsubmit = e => {
       e.preventDefault();
       const answer = answerInput.value.trim();
@@ -235,34 +270,71 @@
       readySection.style.display = "block";
     });
 
+    // === Bereit-Button ===
     readyButton.onclick = () => {
+      readyButton.classList.toggle("active");
       socket.emit("player_ready");
-      readyButton.disabled = true;
-      readyStatus.textContent = "Warte auf andere Spieler...";
+    };
+
+    // === Richtig-Button ===
+    correctButton.onclick = () => {
+      correctButton.classList.toggle("active");
+      socket.emit("player_correct");
     };
 
     socket.on("ready_count", data => {
       readyStatus.textContent = `Bereit: ${data.ready}/${data.total} (${data.names.join(", ")})`;
     });
 
+    socket.on("update_points", data => {
+      const me = localStorage.getItem("player_name");
+      const myPoints = data.points[me] || 0;
+      pointsDisplay.textContent = myPoints;
+    });
+
     socket.on("new_category", data => {
       document.getElementById("category").textContent = data.category;
+      roundDisplay.textContent = data.round;
+      document.getElementById("totalRounds").textContent = data.total_rounds;
 
-      // Reset UI
       answerInput.value = '';
       answerInput.disabled = false;
       submitButton.disabled = false;
       submitButton.style.backgroundColor = '';
 
-      readyButton.disabled = false;
+      readyButton.classList.remove("active");
+      correctButton.classList.remove("active");
       readyStatus.textContent = '';
       document.getElementById("answers").style.display = "none";
       readySection.style.display = "none";
     });
 
+    socket.on("game_over", data => {
+      let results = Object.entries(data.points)
+        .map(([n,p]) => `${n}: ${p} Punkte`)
+        .join("\n");
+      alert("🏁 Spiel beendet!\n\n" + results);
+      localStorage.clear();
+      window.location.href = "/";
+    });
+
+    socket.on("game_aborted", data => {
+      alert(data.reason || "Spiel abgebrochen.");
+      localStorage.clear();
+      window.location.href = "/";
+    });
+
     socket.on("force_rejoin", () => {
       alert("Deine Verbindung ist abgelaufen. Bitte tritt neu bei!");
       window.location.href = "/join";
+    });
+
+    socket.on("sync_state", data => {
+      document.getElementById("round").textContent = data.round;
+      document.getElementById("totalRounds").textContent = data.total_rounds;
+      document.getElementById("category").textContent = data.category || "–";
+      const me = localStorage.getItem("player_name");
+      document.getElementById("points").textContent = data.points[me] || 0;
     });
   </script>
 </body>
