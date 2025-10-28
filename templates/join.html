@@ -4,6 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Beitreten</title>
+
+    <!-- 🟣 PWA-Integration -->
+    <link rel="apple-touch-icon" href="/static/img/icon_512.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/img/icon_192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/static/img/icon_512.png">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#000129">
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/static/serviceWorker.js')
+          .then(() => console.log("✅ Service Worker aktiv"))
+          .catch(err => console.error("❌ SW Fehler:", err));
+      }
+    </script>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <style>
         body {
