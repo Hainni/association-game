@@ -42,6 +42,7 @@ points = {}
 game_id = str(int(time.time()))
 game_phase = "answering"  # "answering", "results", "ready"
 correct_players = set()   # ✅ Spieler, die „Richtig“ aktiv haben
+correct_rounds = 0  # ✅ wie oft ALLE "Richtig" gedrückt hatten
 
 STATE_FILE = os.path.join(app.root_path, "game_state.json")
 
@@ -61,7 +62,6 @@ def get_new_category():
     return new_cat
 
 def save_state():
-    """Speichert aktuellen Spielzustand"""
     data = {
         "game_id": game_id,
         "current_round": current_round,
@@ -71,16 +71,16 @@ def save_state():
         "points": points,
         "game_phase": game_phase,
         "answers": answers if game_phase == "results" else [],
+        "correct_rounds": correct_rounds,  # ✅ neu
     }
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f)
     print("💾 Zustand gespeichert (Phase:", game_phase, ")")
 
-def reset_game():
-    """Setzt den gesamten Spielzustand zurück"""
+def reset_game(broadcast=True):
     global players, answers, ready_players, used_categories
     global current_players, current_category, game_started, max_players
-    global current_round, points, game_id, game_phase, correct_players
+    global current_round, points, game_id, game_phase, correct_players, correct_rounds
 
     players.clear()
     answers.clear()
@@ -94,13 +94,15 @@ def reset_game():
     points = {}
     game_phase = "answering"
     correct_players.clear()
+    correct_rounds = 0
     game_id = str(int(time.time()))
 
     if os.path.exists(STATE_FILE):
         os.remove(STATE_FILE)
 
     print("🔄 Spielzustand vollständig zurückgesetzt (neue game_id:", game_id, ")")
-    socketio.emit('force_game_reset')
+    if broadcast:
+        socketio.emit('force_game_reset')
 
 def load_state():
     """Lädt gespeicherten Zustand (nicht mehr automatisch bei Start)"""
@@ -125,14 +127,15 @@ def on_connect():
 @socketio.on('set_players')
 def set_players(data):
     global max_players, game_started, max_rounds
-    global current_round, used_categories, game_phase, points, correct_players
+    global current_round, used_categories, game_phase, points, correct_players, correct_rounds
 
-    # 🧼 Reset, falls vorherige Daten noch gespeichert waren
+    # 🧼 Reset des Spielstands (hart)
     current_round = 1
     used_categories.clear()
     game_phase = "answering"
     points.clear()
     correct_players.clear()
+    correct_rounds = 0  # ✅ neu
     if os.path.exists(STATE_FILE):
         os.remove(STATE_FILE)
         print("🧹 Alter Spielstand gelöscht – neues Spiel startet bei Runde 1.")
@@ -246,7 +249,8 @@ def handle_player_correct():
 
 @socketio.on('player_ready')
 def handle_player_ready():
-    global ready_players, current_category, current_round, game_phase, correct_players, points
+    global ready_players, current_category, current_round, game_phase
+    global correct_players, points, correct_rounds
 
     sid = flask_request.sid
     if sid not in players:
@@ -259,9 +263,11 @@ def handle_player_ready():
         'names': [players[s]['name'] for s in ready_players]
     })
 
-    # Wenn alle bereit sind → prüfen ob alle "Richtig" gedrückt haben
+    # Wenn alle bereit sind:
     if len(ready_players) == len(players):
-        if len(correct_players) == len(players):  # ✅ nur wenn ALLE "Richtig" gedrückt haben
+        # ✅ Punkte nur, wenn ALLE "Richtig" gedrückt haben
+        if len(correct_players) == len(players):
+            correct_rounds += 1  # 💯 ganze Runde zählt als „richtig“
             for name in correct_players:
                 if name in points:
                     points[name] += 1
@@ -270,17 +276,23 @@ def handle_player_ready():
         else:
             print("⚠️ Nicht alle Spieler haben 'Richtig' gedrückt – keine Punkte vergeben.")
 
-        # --- Nächste Runde oder Spielende ---
+        # Antworten zurücksetzen
         for p in players.values():
             p['answer'] = None
         answers.clear()
 
+        # --- Spielende? ---
         if current_round >= max_rounds:
             print("🏁 Spielende erreicht.")
-            socketio.emit('game_over', {'points': points})
-            reset_game()
+            # Kompatibilitäts-Score (0–100)
+            score = round((correct_rounds / max_rounds) * 100)
+            # 🔔 An alle Clients senden – die Seite leitet dann clientseitig weiter
+            socketio.emit('show_results', {'score': score})
+            # 🧹 Zustand nach kurzer Verzögerung zurücksetzen (ohne Broadcast)
+            eventlet.spawn_after(1.5, reset_game, False)
             return
 
+        # --- Nächste Runde vorbereiten ---
         current_round += 1
         current_category = get_new_category()
         ready_players.clear()
@@ -293,6 +305,7 @@ def handle_player_ready():
             'total_rounds': max_rounds
         })
         save_state()
+
 
 @socketio.on('disconnect')
 def on_disconnect():
@@ -335,9 +348,13 @@ def play():
 def full():
     return render_template('full.html')
 
+@app.route('/result/<int:score>')
+def result(score):
+    return render_template('result.html', score=score)
+
 if __name__ == '__main__':
     if os.path.exists(STATE_FILE):
         os.remove(STATE_FILE)
         print("🧹 Alter Spielstand gelöscht (Serverneustart).")
-    reset_game()
+    reset_game(broadcast=False)
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)

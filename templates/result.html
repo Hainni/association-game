@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kompatibilitäts-Score</title>
+
+  <style>
+    body {
+      background-color: #000129;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+    }
+
+    #banner-container { width: 100%; margin-top: 8px; }
+    #banner {
+      max-width: 90%;
+      height: auto;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+    }
+
+    h1 { font-size: clamp(1.6rem, 5vw, 2.4rem); margin: 0; }
+
+    #percentage {
+      font-size: clamp(3rem, 10vw, 5rem);
+      font-weight: 800;
+      color: #FFD700;
+      line-height: 1;
+      transition: color 1s ease;
+    }
+
+    .thermo-container {
+      position: relative;
+      width: 80%;
+      max-width: 640px;
+      height: 42px;
+      background-color: #1E1F5C;
+      border-radius: 25px;
+      box-shadow: inset 0 0 10px rgba(255,255,255,0.2);
+      overflow: hidden;
+    }
+
+    .thermo-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 25px 0 0 25px;
+      transition: width 1.8s ease-in-out;
+      background: linear-gradient(90deg, red, yellow, lime);
+      background-size: 300% 100%;
+      background-position: left;
+      box-shadow: 0 0 10px rgba(255,255,255,0.2),
+                  inset 0 0 10px rgba(255,255,255,0.3);
+    }
+
+    #backBtn {
+      margin-top: 10px;
+      padding: 12px 24px;
+      background-color: #1E1F5C;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 1.05rem;
+      cursor: pointer;
+      transition: background 0.25s;
+    }
+
+    #backBtn:hover { background-color: #2B2C6E; }
+  </style>
+</head>
+<body>
+  <div id="banner-container">
+    <img src="{{ url_for('static', filename='img/banner.png') }}" alt="Das große Assoziationsspiel" id="banner">
+  </div>
+
+  <h1>Kompatibilitäts-Score</h1>
+
+  <div id="percentage" data-score="{{ score|int }}">{{ score|int }}%</div>
+
+  <div class="thermo-container">
+  <div class="thermo-fill" id="thermoFill"></div>
+</div>
+
+<!-- 🖼️ GIF-Container (zunächst unsichtbar) -->
+ <div id="gifContainer_0_20" style="display:none; margin-top:20px;">
+  <img id="sadGif" 
+       src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExNmZzbGY0NW0ycDIwenQwNDU0OXlrM3NwbWl0cjR1eW0yd3A4bGpzMiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/3o7Zesyac4CuSN5rsA/giphy.gif"
+       alt="Das kann es nicht sein..."
+       style="max-width:250px; border-radius:12px; box-shadow:0 0 10px rgba(255,255,255,0.2);" />
+</div>
+<div id="gifContainer_21_40" style="display:none; margin-top:20px;">
+  <img id="sadGif" 
+       src="https://media.giphy.com/media/3og0IPxMM0erATueVW/giphy.gif"
+       alt="Meh..."
+       style="max-width:250px; border-radius:12px; box-shadow:0 0 10px rgba(255,255,255,0.2);" />
+</div>
+<div id="gifContainer_41_60" style="display:none; margin-top:20px;">
+  <img id="sadGif" 
+       src="https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExbnM4bzk5ZGUxZ2dzbWJ5ZHhudm96ZjEyZTkzdDFsOXl3aXAwY3E2aCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/L3X9GvVhP1nY23Ah6u/giphy.gif"
+       alt="Okay"
+       style="max-width:250px; border-radius:12px; box-shadow:0 0 10px rgba(255,255,255,0.2);" />
+</div>
+<div id="gifContainer_61_80" style="display:none; margin-top:20px;">
+  <img id="sadGif" 
+       src="https://media3.giphy.com/media/v1.Y2lkPTc5MGI3NjExYmpqOXhqeWdrem9nYXFhbTdyODRocXdjaWtvZjZrZzhic3Z3cXRwZCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/NEvPzZ8bd1V4Y/giphy.gif"
+       alt="Almost there..."
+       style="max-width:250px; border-radius:12px; box-shadow:0 0 10px rgba(255,255,255,0.2);" />
+</div>
+<div id="gifContainer_81_100" style="display:none; margin-top:20px;">
+  <img id="sadGif" 
+       src="https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExMzlxbzl4YTVkNGxxcWNnc2xjZ25ubWRib241ZTlydmtieGRwMmNsMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/CIe1iwzke30wU/giphy.gif"
+       alt="That's it!"
+       style="max-width:250px; border-radius:12px; box-shadow:0 0 10px rgba(255,255,255,0.2);" />
+</div>
+
+<button id="backBtn" onclick="window.location.href='/'">Neues Spiel starten</button>
+
+<script>
+  const percentEl = document.getElementById('percentage');
+  const fill = document.getElementById('thermoFill');
+
+  const parsed = parseInt(percentEl.dataset.score, 10);
+  const score = Number.isFinite(parsed) ? Math.min(Math.max(parsed, 0), 100) : 0;
+  percentEl.textContent = score + '%';
+
+  // 🎨 Textfarbe
+  if (score <= 33) percentEl.style.color = '#ff4444';
+  else if (score <= 66) percentEl.style.color = '#ffcc00';
+  else percentEl.style.color = '#66ff66';
+
+  // 🌡️ Farbverlauf
+  setTimeout(() => {
+    fill.style.width = score + '%';
+
+    if (score <= 33) {
+      fill.style.background = '#ff2a2a';
+    } else if (score <= 66) {
+      fill.style.background = 'linear-gradient(90deg, #ff2a2a 0%, #ffcc00 100%)';
+    } else {
+      const split = Math.round((66 / score) * 100);
+      fill.style.background =
+        `linear-gradient(90deg, #ff2a2a 0%, #ffcc00 ${split}%, #ffcc00 ${split}%, #00d34f 100%)`;
+    }
+
+    // 🖼️ GIF-Anzeige nach Score-Bereich
+    const gif_0_20 = document.getElementById('gifContainer_0_20');
+    const gif_21_40 = document.getElementById('gifContainer_21_40');
+    const gif_41_60 = document.getElementById('gifContainer_41_60');
+    const gif_61_80 = document.getElementById('gifContainer_61_80');
+    const gif_81_100 = document.getElementById('gifContainer_81_100');
+
+    // alle ausblenden zuerst
+    gif_0_20.style.display = 'none';
+    gif_21_40.style.display = 'none';
+    gif_41_60.style.display = 'none';
+    gif_61_80.style.display = 'none';
+    gif_81_100.style.display = 'none';
+
+    // passende Anzeige
+    if (score <= 20) {
+      gif_0_20.style.display = 'block';
+    } else if (score <= 40) {
+      gif_21_40.style.display = 'block';
+    } else if (score <= 60) {
+      gif_41_60.style.display = 'block';
+    } else if (score <= 80) {
+      gif_61_80.style.display = 'block';
+    } else {
+      gif_81_100.style.display = 'block';
+    }
+  }, 300);
+</script>
+</body>
+</html>

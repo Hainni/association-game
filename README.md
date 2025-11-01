@@ -1,7 +1,7 @@
 # 🧠 Das große Assoziationsspiel  
 _Ein Multiplayer-Browsergame mit Flask, Socket.IO & PWA-Unterstützung_
 
-![Banner](static/img/banner.png)
+![Banner](static/img/banner.PNG)
 
 ---
 
