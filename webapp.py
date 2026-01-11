@@ -142,29 +142,57 @@ def set_players(data):
     emit('set_players_ack', {'ok': True})
     socketio.emit('game_started_notice', include_self=False)
 
+# webapp.py (Auszug, Zeile 139)
+
 @socketio.on('join_game')
 def join_game(data):
     global current_players
     name = data.get('name')
     sid = flask_request.sid
 
-    if max_players is None or current_players >= max_players:
+    # --- Reconnect/Wiederbeitritt prüfen ---
+    old_sid = None
+    player_found = False
+    
+    # Durch alle aktuellen Spieler iterieren, um den Namen zu finden
+    for player_sid, player_data in list(players.items()): # list() erstellen, da wir das dict ändern könnten
+        if player_data['name'] == name:
+            old_sid = player_sid
+            player_found = True
+            break
+
+    if player_found:
+        # Fall 1: Reconnect erkannt
+        if old_sid and old_sid != sid:
+            # Alte SID löschen, Spieler-Daten auf neue SID übertragen
+            player_data = players.pop(old_sid)
+            players[sid] = player_data
+            print(f"Reconnect erfolgreich: Spieler {name} hat neue SID: {sid}")
+        else:
+             # Spieler ist bereits mit dieser SID bekannt
+             pass 
+
+    # Fall 2: Neuer Spieler tritt bei
+    elif max_players is None or len(players) >= max_players:
         emit('game_full')
         return
 
-    current_players += 1
-    players[sid] = {'id': current_players, 'name': name, 'answer': None}
-    points[name] = points.get(name, 0)
+    else:
+        # Neuer Spieler tritt bei
+        current_players += 1
+        players[sid] = {'id': current_players, 'name': name, 'answer': None}
+        points[name] = points.get(name, 0)
+        print(f"Neuer Spieler: {name} mit SID: {sid}")
 
+    # --- Status senden ---
     socketio.emit('player_count', {
-        'current_players': current_players,
+        'current_players': len(players), 
         'max_players': max_players,
         'names': [p['name'] for p in players.values()]
     })
 
     if len(players) == max_players:
         socketio.emit('start_game')
-        # save_state() ### ENTFERNT ###
 
 @socketio.on('submit_answer')
 def submit_answer(data):
