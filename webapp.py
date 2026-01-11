@@ -1,4 +1,3 @@
-# --- WICHTIG: MUSS GANZ OBEN STEHEN ---
 import eventlet
 eventlet.monkey_patch()
 
@@ -6,6 +5,7 @@ from flask import Flask, render_template, redirect, url_for, request as flask_re
 from flask_session import Session
 from flask_socketio import SocketIO, emit
 import os, random, time, json, logging
+# import os, random, time, json, logging # `json` wird für STATE_FILE nicht mehr benötigt
 
 logging.getLogger('eventlet.wsgi').setLevel(logging.ERROR)
 
@@ -14,7 +14,11 @@ app.secret_key = 'super_secret_key_123'  # später als ENV setzen
 
 # --- Session-Konfiguration ---
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['SESSION_FILE_DIR'] = os.path.join(app.root_path, 'flask_session_data')
+# ACHTUNG: Auch die Session-Daten werden in eine lokale Datei geschrieben.
+# Für Render ist es **stark empfohlen**, dies auf 'redis' oder 'memcached' zu ändern,
+# oder die Session komplett zu deaktivieren, da das lokale Filesystem bei Render flüchtig ist.
+# Fürs Erste belassen wir es, aber es ist ein potenzieller zukünftiger Fehler.
+app.config['SESSION_FILE_DIR'] = os.path.join(app.root_path, 'flask_session_data') 
 app.config['SESSION_PERMANENT'] = False
 Session(app)
 
@@ -50,7 +54,7 @@ game_id = str(int(time.time()))
 game_phase = "answering"
 correct_players = set()
 
-STATE_FILE = os.path.join(app.root_path, "game_state.json")
+# STATE_FILE = os.path.join(app.root_path, "game_state.json") ### ENTFERNT ###
 
 # --- Hilfsfunktionen ---
 def load_categories():
@@ -66,19 +70,19 @@ def get_new_category():
     used_categories.add(new_cat)
     return new_cat
 
-def save_state():
-    data = {
-        "game_id": game_id,
-        "current_round": current_round,
-        "max_rounds": max_rounds,
-        "used_categories": list(used_categories),
-        "current_category": current_category,
-        "points": points,
-        "game_phase": game_phase,
-        "answers": answers if game_phase == "results" else [],
-    }
-    with open(STATE_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f)
+# def save_state(): ### ENTFERNT ###
+#     data = {
+#         "game_id": game_id,
+#         "current_round": current_round,
+#         "max_rounds": max_rounds,
+#         "used_categories": list(used_categories),
+#         "current_category": current_category,
+#         "points": points,
+#         "game_phase": game_phase,
+#         "answers": answers if game_phase == "results" else [],
+#     }
+#     with open(STATE_FILE, "w", encoding="utf-8") as f:
+#         json.dump(data, f) ### ENTFERNT ###
 
 def reset_game():
     global players, answers, ready_players, used_categories
@@ -99,8 +103,8 @@ def reset_game():
     correct_players.clear()
     game_id = str(int(time.time()))
 
-    if os.path.exists(STATE_FILE):
-        os.remove(STATE_FILE)
+    # if os.path.exists(STATE_FILE): ### ENTFERNT ###
+    #     os.remove(STATE_FILE) ### ENTFERNT ###
 
     socketio.emit('force_game_reset')
 
@@ -160,7 +164,7 @@ def join_game(data):
 
     if len(players) == max_players:
         socketio.emit('start_game')
-        save_state()
+        # save_state() ### ENTFERNT ###
 
 @socketio.on('submit_answer')
 def submit_answer(data):
@@ -177,7 +181,7 @@ def submit_answer(data):
         game_phase = "results"
         socketio.emit('all_answers_submitted', {'answers': answers})
         socketio.emit('ready_phase_start')
-        save_state()
+        # save_state() ### ENTFERNT ###
 
 @socketio.on('player_ready')
 def handle_player_ready():
@@ -203,8 +207,7 @@ def handle_player_ready():
             'round': current_round,
             'total_rounds': max_rounds
         })
-        save_state()
-
+        # save_state() ### ENTFERNT ###
 
 # --- Routen ---
 @app.route('/')
