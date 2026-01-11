@@ -210,6 +210,14 @@ def handle_player_ready():
 def index():
     return render_template('index.html', game_id=game_id)
 
+@app.route('/join')
+def join():
+    return render_template('join.html', game_id=game_id)
+
+@app.route('/full')
+def full():
+    return render_template('full.html', game_id=game_id)
+
 @app.route('/play')
 def play():
     global current_category
