@@ -142,19 +142,7 @@ def set_players(data):
 def join_game(data):
     global current_players
     name = data.get('name')
-    reconnect_sid = data.get('reconnect_sid')
     sid = flask_request.sid
-
-    # --- Reconnect-Mechanismus ---
-    if reconnect_sid and reconnect_sid in players:
-        players[sid] = players.pop(reconnect_sid)
-        print(f"🔁 Spieler {name} reconnectet: {sid}")
-        emit('player_count', {
-            'current_players': len(players),
-            'max_players': max_players,
-            'names': [p['name'] for p in players.values()]
-        })
-        return
 
     if max_players is None or current_players >= max_players:
         emit('game_full')
@@ -180,10 +168,6 @@ def submit_answer(data):
     sid = flask_request.sid
 
     if game_phase != "answering":
-        return
-
-    if sid not in players:
-        print(f"⚠️ submit_answer: unbekannter Spieler SID {sid}")
         return
 
     players[sid]['answer'] = data['answer']
