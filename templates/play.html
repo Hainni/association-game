@@ -212,13 +212,17 @@
     document.getElementById("totalRounds").textContent = totalRounds;
 
     const savedName = localStorage.getItem("player_name");
-    const savedSid = localStorage.getItem("player_sid");
+    // const savedSid = localStorage.getItem("player_sid");
 
     // === Verbindung & Reconnect ===
     socket.on("connect", () => {
-      localStorage.setItem("player_sid", socket.id);
+      // Wir speichern die SID nur zur Info, aber der Server nutzt den Namen
+      localStorage.setItem("player_sid", socket.id); 
+      
       if (savedName) {
-        socket.emit("join_game", { name: savedName, reconnect_sid: savedSid });
+        // Sende den Spielernamen bei jedem Connect/Reconnect,
+        // damit der Server die korrekte SID zuordnen kann.
+        socket.emit("join_game", { name: savedName });
       }
     });
 

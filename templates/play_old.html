@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Spiel läuft</title>
+
+  <!-- 🟣 PWA -->
+  <link rel="apple-touch-icon" href="/static/img/icon_512.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/static/img/icon_192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="/static/img/icon_512.png">
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#000129">
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/static/serviceWorker.js')
+        .then(() => console.log("✅ Service Worker aktiv"))
+        .catch(err => console.error("❌ SW Fehler:", err));
+    }
+  </script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #000129;
+      color: white;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #banner-container {
+      text-align: center;
+      width: 100%;
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+
+    #banner {
+      max-width: 90%;
+      height: auto;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+    }
+
+    h1 {
+      font-size: clamp(1.3rem, 4vw, 1.8rem);
+      margin-top: 1em;
+      margin-bottom: 0.4em;
+      padding: 0 10px;
+      font-weight: 600;
+    }
+
+    #scoreboard {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 15px;
+    }
+
+    #scoreboard div {
+      background-color: #1E1F5C;
+      padding: 8px 16px;
+      border-radius: 20px;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+      font-weight: 600;
+    }
+
+    #category {
+      display: block;
+      background-color: #1A1B4B;
+      padding: 14px 20px;
+      border-radius: 20px;
+      font-weight: bold;
+      font-size: clamp(1.4rem, 6vw, 2.2rem);
+      max-width: 90%;
+      margin: 10px auto 20px auto;
+      overflow-wrap: break-word;
+    }
+
+    input[type="text"] {
+      width: 80%;
+      max-width: 400px;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      font-size: 1rem;
+      outline: none;
+    }
+
+    #submitButton {
+      margin-top: 12px;
+      background-color: #4CAF50;
+      color: white;
+      padding: 10px 22px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    #submitButton:disabled { background-color: #888; }
+
+    #answers ul {
+      list-style: none;
+      padding: 0;
+      margin: 15px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+    }
+
+    #answers li {
+      background-color: #1E1F5C;
+      border-radius: 12px;
+      margin: 5px 0;
+      width: 85%;
+      max-width: 600px;
+      padding: 14px 16px;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+      word-wrap: break-word;
+    }
+
+    #answers li strong { color: #FFD700; display: block; }
+
+    #readySection {
+      display: none;
+      margin-top: 30px;
+      margin-bottom: 20px;
+    }
+
+    #buttonRow {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      background-color: #1E1F5C;
+      color: white;
+      border: none;
+      border-radius: 14px;
+      padding: 12px 24px;
+      font-size: 1rem;
+      cursor: pointer;
+      font-weight: 600;
+      box-shadow: 0 0 10px rgba(255,255,255,0.1);
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover {
+      background-color: #2B2C6E;
+      transform: translateY(-1px);
+    }
+
+    .action-btn.active {
+      background-color: #4CAF50;
+      box-shadow: 0 0 15px rgba(76, 175, 80, 0.6);
+    }
+
+    #readyStatus {
+      margin-top: 10px;
+      font-size: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="banner-container">
+    <img src="{{ url_for('static', filename='img/banner.png') }}" alt="Das große Assoziationsspiel" id="banner">
+  </div>
+
+  <div id="scoreboard">
+    <div>Punkte: <span id="points">0</span></div>
+    <div>Runde <span id="round">1</span>/<span id="totalRounds">10</span></div>
+  </div>
+
+  <h1><span id="category">{{ category }}</span></h1>
+  <p>Gib deine Antwort unten ein:</p>
+
+  <form id="answerForm">
+    <input type="text" id="answerInput" placeholder="Deine Antwort" required>
+    <button type="submit" id="submitButton">Absenden</button>
+  </form>
+
+  <div id="answers" style="display:none;">
+    <ul id="answerList"></ul>
+  </div>
+
+  <div id="readySection">
+    <div id="buttonRow">
+      <button id="readyButton" class="action-btn">Bereit</button>
+      <button id="correctButton" class="action-btn">Richtig</button>
+    </div>
+    <p id="readyStatus"></p>
+  </div>
+
+  <script>
+    const socket = io({ withCredentials: true, transports: ['websocket', 'polling'] });
+
+    // Standardwerte laden
+    const totalRounds = localStorage.getItem("total_rounds") || 10;
+    document.getElementById("totalRounds").textContent = totalRounds;
+
+    const savedName = localStorage.getItem("player_name");
+    const savedSid = localStorage.getItem("player_sid");
+
+    // === Verbindung & Reconnect ===
+    socket.on("connect", () => {
+      localStorage.setItem("player_sid", socket.id);
+      if (savedName) {
+        socket.emit("join_game", { name: savedName, reconnect_sid: savedSid });
+      }
+    });
+
+    socket.on("server_game_id", data => {
+      const serverId = data.game_id;
+      const storedId = localStorage.getItem("game_id");
+      if (storedId && storedId !== serverId) {
+        alert("Das Spiel wurde beendet. Bitte starte ein neues Spiel.");
+        localStorage.clear();
+        localStorage.setItem("game_id", serverId);
+        window.location.href = "/";
+      }
+    });
+
+    // === DOM-Elemente ===
+    const answerForm = document.getElementById("answerForm");
+    const answerInput = document.getElementById("answerInput");
+    const submitButton = document.getElementById("submitButton");
+    const readyButton = document.getElementById("readyButton");
+    const correctButton = document.getElementById("correctButton");
+    const readyStatus = document.getElementById("readyStatus");
+    const answerList = document.getElementById("answerList");
+    const pointsDisplay = document.getElementById("points");
+    const roundDisplay = document.getElementById("round");
+    const readySection = document.getElementById("readySection");
+
+    // === Antwort senden ===
+    answerForm.onsubmit = e => {
+      e.preventDefault();
+      const answer = answerInput.value.trim();
+      if (!answer) return;
+      socket.emit("submit_answer", { answer });
+      answerInput.disabled = true;
+      submitButton.disabled = true;
+      submitButton.style.backgroundColor = "#666";
+    };
+
+    socket.on("all_answers_submitted", data => {
+      answerList.innerHTML = '';
+      data.answers.forEach(entry => {
+        const li = document.createElement("li");
+        li.innerHTML = `<strong>${entry.name}</strong><br>${entry.answer}`;
+        answerList.appendChild(li);
+      });
+      document.getElementById("answers").style.display = "block";
+    });
+
+    socket.on("ready_phase_start", () => {
+      readySection.style.display = "block";
+    });
+
+    // === Bereit-Button ===
+    readyButton.onclick = () => {
+      readyButton.classList.toggle("active");
+      socket.emit("player_ready");
+    };
+
+    // === Richtig-Button ===
+    correctButton.onclick = () => {
+      correctButton.classList.toggle("active");
+      socket.emit("player_correct");
+    };
+
+    socket.on("ready_count", data => {
+      readyStatus.textContent = `Bereit: ${data.ready}/${data.total} (${data.names.join(", ")})`;
+    });
+
+    socket.on("update_points", data => {
+      const me = localStorage.getItem("player_name");
+      const myPoints = data.points[me] || 0;
+      pointsDisplay.textContent = myPoints;
+    });
+
+    socket.on("new_category", data => {
+      document.getElementById("category").textContent = data.category;
+      roundDisplay.textContent = data.round;
+      document.getElementById("totalRounds").textContent = data.total_rounds;
+
+      // 🧩 Eingabefeld sichtbar und bereit machen
+      const answerForm = document.getElementById("answerForm");
+      answerForm.style.display = "block";
+      answerInput.value = '';
+      answerInput.disabled = false;
+      submitButton.disabled = false;
+      submitButton.style.backgroundColor = '';
+
+      // 🔁 Anzeige zurücksetzen
+      readyButton.classList.remove("active");
+      correctButton.classList.remove("active");
+      readyStatus.textContent = '';
+      document.getElementById("answers").style.display = "none";
+      readySection.style.display = "none";
+    });
+
+    socket.on("game_over", data => {
+      let results = Object.entries(data.points)
+        .map(([n,p]) => `${n}: ${p} Punkte`)
+        .join("\n");
+      alert("🏁 Spiel beendet!\n\n" + results);
+      localStorage.clear();
+      window.location.href = "/";
+    });
+
+    socket.on("game_aborted", data => {
+      alert(data.reason || "Spiel abgebrochen.");
+      localStorage.clear();
+      window.location.href = "/";
+    });
+
+    socket.on("force_rejoin", () => {
+      alert("Deine Verbindung ist abgelaufen. Bitte tritt neu bei!");
+      window.location.href = "/join";
+    });
+
+    socket.on("sync_state", data => {
+      document.getElementById("round").textContent = data.round;
+      document.getElementById("totalRounds").textContent = data.total_rounds;
+      document.getElementById("category").textContent = data.category || "–";
+      const me = localStorage.getItem("player_name");
+      document.getElementById("points").textContent = data.points[me] || 0;
+
+      // Wenn Spieler in Ergebnisphase reloadet:
+      if (data.phase === "results" && data.answers.length > 0) {
+        const answerList = document.getElementById("answerList");
+        answerList.innerHTML = '';
+        data.answers.forEach(entry => {
+          const li = document.createElement("li");
+          li.innerHTML = `<strong>${entry.name}</strong><br>${entry.answer}`;
+          answerList.appendChild(li);
+        });
+        document.getElementById("answers").style.display = "block";
+        document.getElementById("answerForm").style.display = "none";
+        document.getElementById("readySection").style.display = "block";
+      }
+    });
+  </script>
+</body>
+</html>
