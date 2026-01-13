@@ -176,7 +176,7 @@
 </head>
 <body>
   <div id="banner-container">
-    <img src="{{ url_for('static', filename='img/banner.png') }}" alt="Das große Assoziationsspiel" id="banner">
+    <img src="/static/img/banner.PNG" id="banner" alt="Das große Assoziationsspiel">
   </div>
 
   <div id="scoreboard">
@@ -320,6 +320,12 @@
       alert("🏁 Spiel beendet!\n\n" + results);
       localStorage.clear();
       window.location.href = "/";
+    });
+
+    socket.on('show_results', (data) => {
+        console.log("Ergebnisse empfangen, Score:", data.score);
+        // Leite den Browser auf die Ergebnisseite um
+        window.location.href = "/result/" + data.score;
     });
 
     socket.on("game_aborted", data => {
