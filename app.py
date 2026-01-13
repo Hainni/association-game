@@ -3,6 +3,7 @@ from flask_session import Session
 from flask_socketio import SocketIO, emit
 import os, random, time, json, logging
 import eventlet
+eventlet.monkey_patch()
 
 logging.getLogger('eventlet.wsgi').setLevel(logging.ERROR)
 
