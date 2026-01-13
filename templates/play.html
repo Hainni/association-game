@@ -317,13 +317,11 @@
       readySection.style.display = "none";
     });
 
-    socket.on("game_over", data => {
-      let results = Object.entries(data.points)
-        .map(([n,p]) => `${n}: ${p} Punkte`)
-        .join("\n");
-      alert("🏁 Spiel beendet!\n\n" + results);
+    socket.on("show_results", (data) => {
+      // sichere Weiterleitung auf Ergebnisseite
+      const score = typeof data?.score === 'number' ? data.score : 0;
       localStorage.clear();
-      window.location.href = "/";
+      window.location.href = `/result/${score}`;
     });
 
     socket.on("game_aborted", data => {
