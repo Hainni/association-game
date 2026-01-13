@@ -212,17 +212,13 @@
     document.getElementById("totalRounds").textContent = totalRounds;
 
     const savedName = localStorage.getItem("player_name");
-    // const savedSid = localStorage.getItem("player_sid");
+    const savedSid = localStorage.getItem("player_sid");
 
     // === Verbindung & Reconnect ===
     socket.on("connect", () => {
-      // Wir speichern die SID nur zur Info, aber der Server nutzt den Namen
-      localStorage.setItem("player_sid", socket.id); 
-      
+      localStorage.setItem("player_sid", socket.id);
       if (savedName) {
-        // Sende den Spielernamen bei jedem Connect/Reconnect,
-        // damit der Server die korrekte SID zuordnen kann.
-        socket.emit("join_game", { name: savedName });
+        socket.emit("join_game", { name: savedName, reconnect_sid: savedSid });
       }
     });
 
@@ -317,11 +313,13 @@
       readySection.style.display = "none";
     });
 
-    socket.on("show_results", (data) => {
-      // sichere Weiterleitung auf Ergebnisseite
-      const score = typeof data?.score === 'number' ? data.score : 0;
+    socket.on("game_over", data => {
+      let results = Object.entries(data.points)
+        .map(([n,p]) => `${n}: ${p} Punkte`)
+        .join("\n");
+      alert("🏁 Spiel beendet!\n\n" + results);
       localStorage.clear();
-      window.location.href = `/result/${score}`;
+      window.location.href = "/";
     });
 
     socket.on("game_aborted", data => {
