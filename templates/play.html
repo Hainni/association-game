@@ -108,13 +108,13 @@
 
     #submitButton:disabled { background-color: #888; }
 
-    /* --- NEUES LAYOUT: Flex Wrapper für Liste + Checkbox --- */
+    /* --- LAYOUT: Flex Wrapper für Liste + Checkbox --- */
     .answers-flex-wrapper {
       display: flex;
       flex-direction: row;
-      align-items: center; /* Zentriert die Checkbox vertikal zur Liste */
+      align-items: center; 
       justify-content: center;
-      gap: 20px; /* Abstand zwischen Liste und Checkbox */
+      gap: 20px; 
       width: 95%;
       max-width: 600px;
       margin: 15px auto;
@@ -124,21 +124,23 @@
       list-style: none;
       padding: 0;
       margin: 0;
-      flex-grow: 1; /* Liste nimmt den verfügbaren Platz ein */
+      flex-grow: 1; 
       display: flex;
       flex-direction: column;
-      align-items: center; /* Zentriert die Items in der Liste */
+      align-items: center; 
     }
 
     #answerList li {
       background-color: #1E1F5C;
       border-radius: 12px;
       margin: 5px 0;
-      width: 100%; /* Füllt den Listen-Bereich */
+      width: 100%; 
       padding: 14px 16px;
       box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
       word-wrap: break-word;
-      text-align: left; /* Text in den Boxen linksbündig oder zentriert, wie gewünscht */
+      
+      /* HIER GEÄNDERT: Alles zentriert */
+      text-align: center; 
     }
 
     #answerList li strong { color: #FFD700; display: block; margin-bottom: 4px; }
@@ -148,12 +150,12 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      min-width: 80px; /* Verhindert, dass sie gequetscht wird */
+      min-width: 80px; 
     }
 
     .single-checkbox-sidebar label {
       font-size: 0.9rem;
-      color: #4CAF50; /* Grün wie "Richtig" */
+      color: #4CAF50; 
       font-weight: bold;
       margin-bottom: 6px;
       text-transform: uppercase;
@@ -244,7 +246,7 @@
   <div id="readySection">
     <div id="buttonRow">
       <button id="readyButton" class="action-btn">Bereit</button>
-      </div>
+    </div>
     <p id="readyStatus"></p>
   </div>
 
@@ -282,7 +284,7 @@
     const answerInput = document.getElementById("answerInput");
     const submitButton = document.getElementById("submitButton");
     const readyButton = document.getElementById("readyButton");
-    const globalCheckbox = document.getElementById("globalCorrect"); // Neue Checkbox
+    const globalCheckbox = document.getElementById("globalCorrect"); 
     const readyStatus = document.getElementById("readyStatus");
     const answerList = document.getElementById("answerList");
     const pointsDisplay = document.getElementById("points");
@@ -316,15 +318,22 @@
       readySection.style.display = "block";
     });
 
-    // === Bereit-Button ===
-    readyButton.onclick = () => {
-      readyButton.classList.toggle("active");
-      socket.emit("player_ready");
+    // === Bereit-Button Logik (Toggle) ===
+    readyButton.onclick = function() {
+      // Prüfen, ob wir schon "ready" sind (Klasse active ist gesetzt)
+      if (this.classList.contains("active")) {
+        // ZURÜCKSETZEN (Un-Ready)
+        this.classList.remove("active");
+        socket.emit("player_unready"); // Sende Signal an Server, dass wir nicht mehr bereit sind
+      } else {
+        // BEREIT SETZEN
+        this.classList.add("active");
+        socket.emit("player_ready");
+      }
     };
 
-    // === Checkbox Logic (Ersetzt Richtig-Button) ===
+    // === Checkbox Logic ===
     globalCheckbox.onclick = () => {
-      // Sendet das gleiche Signal wie früher der Button
       socket.emit("player_correct");
     };
 
@@ -353,7 +362,7 @@
 
       // 🔁 Anzeige zurücksetzen
       readyButton.classList.remove("active");
-      globalCheckbox.checked = false; // Checkbox leeren
+      globalCheckbox.checked = false; 
       readyStatus.textContent = '';
       document.getElementById("answers").style.display = "none";
       readySection.style.display = "none";
@@ -369,7 +378,6 @@
     });
 
     socket.on('show_results', (data) => {
-        console.log("Ergebnisse empfangen, Score:", data.score);
         window.location.href = "/result/" + data.score;
     });
 
@@ -391,7 +399,6 @@
       const me = localStorage.getItem("player_name");
       document.getElementById("points").textContent = data.points[me] || 0;
 
-      // Wenn Spieler in Ergebnisphase reloadet:
       if (data.phase === "results" && data.answers.length > 0) {
         answerList.innerHTML = '';
         data.answers.forEach(entry => {

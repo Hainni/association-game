@@ -72,7 +72,7 @@ def save_state():
         "points": points,
         "game_phase": game_phase,
         "answers": answers if game_phase == "results" else [],
-        "correct_rounds": correct_rounds,  # ✅ neu
+        "correct_rounds": correct_rounds, 
     }
     with open(STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f)
@@ -136,7 +136,7 @@ def set_players(data):
     game_phase = "answering"
     points.clear()
     correct_players.clear()
-    correct_rounds = 0  # ✅ neu
+    correct_rounds = 0 
     if os.path.exists(STATE_FILE):
         os.remove(STATE_FILE)
         print("🧹 Alter Spielstand gelöscht – neues Spiel startet bei Runde 1.")
@@ -307,6 +307,21 @@ def handle_player_ready():
         })
         save_state()
 
+# ✅ NEU: "Nicht mehr Bereit" Handler (für den Toggle im Frontend)
+@socketio.on('player_unready')
+def handle_player_unready():
+    global ready_players
+    sid = flask_request.sid
+    
+    if sid in ready_players:
+        ready_players.remove(sid)
+        
+        # Sende aktualisierte Zählung an alle
+        socketio.emit('ready_count', {
+            'ready': len(ready_players),
+            'total': len(players),
+            'names': [players[s]['name'] for s in ready_players]
+        })
 
 @socketio.on('disconnect')
 def on_disconnect():
