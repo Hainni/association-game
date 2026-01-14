@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Spiel läuft</title>
 
-  <!-- 🟣 PWA -->
   <link rel="apple-touch-icon" href="/static/img/icon_512.png">
   <link rel="icon" type="image/png" sizes="192x192" href="/static/img/icon_192.png">
   <link rel="icon" type="image/png" sizes="512x512" href="/static/img/icon_512.png">
@@ -109,32 +108,70 @@
 
     #submitButton:disabled { background-color: #888; }
 
-    #answers ul {
-      list-style: none;
-      padding: 0;
-      margin: 15px 0;
+    /* --- NEUES LAYOUT: Flex Wrapper für Liste + Checkbox --- */
+    .answers-flex-wrapper {
       display: flex;
-      flex-direction: column;
-      align-items: center;
-      width: 100%;
+      flex-direction: row;
+      align-items: center; /* Zentriert die Checkbox vertikal zur Liste */
+      justify-content: center;
+      gap: 20px; /* Abstand zwischen Liste und Checkbox */
+      width: 95%;
+      max-width: 600px;
+      margin: 15px auto;
     }
 
-    #answers li {
+    #answerList {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      flex-grow: 1; /* Liste nimmt den verfügbaren Platz ein */
+      display: flex;
+      flex-direction: column;
+      align-items: center; /* Zentriert die Items in der Liste */
+    }
+
+    #answerList li {
       background-color: #1E1F5C;
       border-radius: 12px;
       margin: 5px 0;
-      width: 85%;
-      max-width: 600px;
+      width: 100%; /* Füllt den Listen-Bereich */
       padding: 14px 16px;
       box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
       word-wrap: break-word;
+      text-align: left; /* Text in den Boxen linksbündig oder zentriert, wie gewünscht */
     }
 
-    #answers li strong { color: #FFD700; display: block; }
+    #answerList li strong { color: #FFD700; display: block; margin-bottom: 4px; }
 
+    /* --- Die Checkbox Sidebar --- */
+    .single-checkbox-sidebar {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 80px; /* Verhindert, dass sie gequetscht wird */
+    }
+
+    .single-checkbox-sidebar label {
+      font-size: 0.9rem;
+      color: #4CAF50; /* Grün wie "Richtig" */
+      font-weight: bold;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      font-family: sans-serif;
+    }
+
+    .correct-checkbox {
+      width: 35px;
+      height: 35px;
+      cursor: pointer;
+      accent-color: #4CAF50;
+      border: 2px solid #4CAF50;
+    }
+
+    /* --- Ready Section (Button Row) --- */
     #readySection {
       display: none;
-      margin-top: 30px;
+      margin-top: 20px;
       margin-bottom: 20px;
     }
 
@@ -142,7 +179,6 @@
       display: flex;
       justify-content: center;
       gap: 12px;
-      flex-wrap: wrap;
     }
 
     .action-btn {
@@ -150,7 +186,7 @@
       color: white;
       border: none;
       border-radius: 14px;
-      padding: 12px 24px;
+      padding: 12px 30px;
       font-size: 1rem;
       cursor: pointer;
       font-weight: 600;
@@ -193,14 +229,22 @@
   </form>
 
   <div id="answers" style="display:none;">
-    <ul id="answerList"></ul>
+    <div class="answers-flex-wrapper">
+      
+      <ul id="answerList"></ul>
+      
+      <div class="single-checkbox-sidebar">
+        <label for="globalCorrect">Richtig?</label>
+        <input type="checkbox" id="globalCorrect" class="correct-checkbox">
+      </div>
+
+    </div>
   </div>
 
   <div id="readySection">
     <div id="buttonRow">
       <button id="readyButton" class="action-btn">Bereit</button>
-      <button id="correctButton" class="action-btn">Richtig</button>
-    </div>
+      </div>
     <p id="readyStatus"></p>
   </div>
 
@@ -238,7 +282,7 @@
     const answerInput = document.getElementById("answerInput");
     const submitButton = document.getElementById("submitButton");
     const readyButton = document.getElementById("readyButton");
-    const correctButton = document.getElementById("correctButton");
+    const globalCheckbox = document.getElementById("globalCorrect"); // Neue Checkbox
     const readyStatus = document.getElementById("readyStatus");
     const answerList = document.getElementById("answerList");
     const pointsDisplay = document.getElementById("points");
@@ -260,9 +304,11 @@
       answerList.innerHTML = '';
       data.answers.forEach(entry => {
         const li = document.createElement("li");
-        li.innerHTML = `<strong>${entry.name}</strong><br>${entry.answer}`;
+        li.innerHTML = `<strong>${entry.name}</strong><span>${entry.answer}</span>`;
         answerList.appendChild(li);
       });
+      // Checkbox resetten
+      globalCheckbox.checked = false;
       document.getElementById("answers").style.display = "block";
     });
 
@@ -276,9 +322,9 @@
       socket.emit("player_ready");
     };
 
-    // === Richtig-Button ===
-    correctButton.onclick = () => {
-      correctButton.classList.toggle("active");
+    // === Checkbox Logic (Ersetzt Richtig-Button) ===
+    globalCheckbox.onclick = () => {
+      // Sendet das gleiche Signal wie früher der Button
       socket.emit("player_correct");
     };
 
@@ -307,7 +353,7 @@
 
       // 🔁 Anzeige zurücksetzen
       readyButton.classList.remove("active");
-      correctButton.classList.remove("active");
+      globalCheckbox.checked = false; // Checkbox leeren
       readyStatus.textContent = '';
       document.getElementById("answers").style.display = "none";
       readySection.style.display = "none";
@@ -324,7 +370,6 @@
 
     socket.on('show_results', (data) => {
         console.log("Ergebnisse empfangen, Score:", data.score);
-        // Leite den Browser auf die Ergebnisseite um
         window.location.href = "/result/" + data.score;
     });
 
@@ -348,11 +393,10 @@
 
       // Wenn Spieler in Ergebnisphase reloadet:
       if (data.phase === "results" && data.answers.length > 0) {
-        const answerList = document.getElementById("answerList");
         answerList.innerHTML = '';
         data.answers.forEach(entry => {
           const li = document.createElement("li");
-          li.innerHTML = `<strong>${entry.name}</strong><br>${entry.answer}`;
+          li.innerHTML = `<strong>${entry.name}</strong><span>${entry.answer}</span>`;
           answerList.appendChild(li);
         });
         document.getElementById("answers").style.display = "block";
