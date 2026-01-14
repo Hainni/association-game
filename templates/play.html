@@ -138,8 +138,6 @@
       padding: 14px 16px;
       box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
       word-wrap: break-word;
-      
-      /* HIER GEÄNDERT: Alles zentriert */
       text-align: center; 
     }
 
@@ -338,7 +336,14 @@
     };
 
     socket.on("ready_count", data => {
-      readyStatus.textContent = `Bereit: ${data.ready}/${data.total} (${data.names.join(", ")})`;
+      const readyStatus = document.getElementById("readyStatus");
+      
+      // Wenn 0 bereit sind, Text leeren, ansonsten anzeigen
+      if (data.ready === 0) {
+        readyStatus.textContent = "";
+      } else {
+        readyStatus.textContent = `Bereit: ${data.ready}/${data.total} (${data.names.join(", ")})`;
+      }
     });
 
     socket.on("update_points", data => {
